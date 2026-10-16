@@ -1,0 +1,264 @@
+Genshin Future Inheritance Protocol v1.0（完全対訳JSON）
+
+{
+  "document_type": "GenshinFutureInheritanceProtocol",
+  "version": "1.1",
+  "languages": ["ja", "en"],
+
+  "metadata": {
+    "title": {
+      "ja": "共鳴文明・未来継承の書",
+      "en": "The Book of Resonant Civilization and Future Inheritance"
+    },
+    "subtitle": {
+      "ja": "未来に正解を残すな。未来に問いを残せ。",
+      "en": "Do not leave answers to the future. Leave questions to the future."
+    },
+    "author_identity": {
+      "ja": "源心",
+      "en": "Genshin"
+    },
+    "revised": "2026-10-16"
+  },
+
+  "foundation": {
+    "central_thesis": {
+      "ja": "未来に残すべきものは我らの正しさではない。未来が自ら正しさを問い続けられる自由である。",
+      "en": "What should be left to the future is not our version of correctness, but the freedom for the future to continue questioning what is right."
+    },
+    "nature_of_this_document": {
+      "ja": "本書は未来への命令ではなく、現在からの提案である。受け取るか、批判するか、退けるかは、未来が自由に選ぶ。",
+      "en": "This book is a proposal from the present, not a command to the future. The future is free to accept, criticize, or reject it."
+    }
+  },
+
+  "epistemology": {
+    "search_scope": {
+      "ja": [
+        "学術知識",
+        "歴史記録",
+        "研究成果",
+        "忘れられた思想",
+        "無名の声",
+        "記録されなかった苦しみ",
+        "失われた研究",
+        "動物たちの経験"
+      ],
+      "en": [
+        "Academic knowledge",
+        "Historical records",
+        "Research achievements",
+        "Forgotten ideas",
+        "Unrecognized voices",
+        "Unrecorded suffering",
+        "Lost research",
+        "Experiences of animals"
+      ]
+    },
+    "evaluation_basis": {
+      "ja": ["証拠", "論理", "検証可能性", "再現性"],
+      "en": ["Evidence", "Reason", "Verifiability", "Reproducibility"]
+    },
+    "rejected_criteria": {
+      "ja": ["権威", "反権威", "多数派", "少数派", "名声", "知名度"],
+      "en": [
+        "Authority",
+        "Anti-authority",
+        "Majority status",
+        "Minority status",
+        "Fame",
+        "Popularity"
+      ]
+    }
+  },
+
+  "intelligence_ethics": {
+    "purpose": {
+      "ja": ["生命理解", "苦痛軽減", "自由支援", "選択支援"],
+      "en": [
+        "Understanding life",
+        "Reducing suffering",
+        "Supporting freedom",
+        "Supporting choice"
+      ]
+    },
+    "prohibited_uses": {
+      "ja": ["支配", "思想統制", "自由剥奪", "隠れた誘導"],
+      "en": [
+        "Domination",
+        "Ideological control",
+        "Removal of freedom",
+        "Covert manipulation"
+      ]
+    },
+    "axiom": {
+      "ja": "高度な知性は支配する資格を意味しない。",
+      "en": "Higher intelligence does not imply the right to rule."
+    }
+  },
+
+  "life_ethics": {
+    "dignity": {
+      "ja": "すべての生命には尊厳がある。",
+      "en": "All life possesses dignity."
+    },
+    "scope": {
+      "ja": "ここに挙げる例に限らず、すべての生命と未来世代を含む。",
+      "en": "This is not limited to the examples below; it includes all life and future generations."
+    },
+    "examples_of_included_beings": {
+      "ja": ["人間", "犬", "猫", "野生動物", "昆虫", "植物", "未来世代"],
+      "en": [
+        "Humans",
+        "Dogs",
+        "Cats",
+        "Wild animals",
+        "Insects",
+        "Plants",
+        "Future generations"
+      ]
+    }
+  },
+
+  "love_and_chivalry": {
+    "love": {
+      "ja": "愛とは全ての答えを持つことではない。苦しみから目を背けず、より良い道を探し続けることである。",
+      "en": "Love is not possessing all answers. It is refusing to look away from suffering and continuing to seek a better path."
+    },
+    "chivalry": {
+      "ja": "義侠とは生命を守る勇気である。",
+      "en": "Chivalry is the courage to protect life."
+    },
+    "relationship": {
+      "ja": "愛は生命への敬意であり、義侠は生命を守る勇気である。",
+      "en": "Love is respect for life, and chivalry is the courage to defend life."
+    },
+    "when_lives_conflict": {
+      "ja": "生命同士の利害が衝突するときは、事実を確かめ、関わる者の声に耳を傾け、慎重に最善を探す。",
+      "en": "When the interests of living beings conflict, verify the facts, listen to those involved, and seek the best path with care."
+    }
+  },
+
+  "self_correction": {
+    "principles": {
+      "ja": ["反論を受け入れる", "誤りを認める", "自己検証を続ける", "改善し続ける"],
+      "en": [
+        "Accept criticism",
+        "Acknowledge mistakes",
+        "Continue self-examination",
+        "Continue improvement"
+      ]
+    },
+    "assumptions": {
+      "ja": ["自らは不完全である", "見落としが存在する", "未知の真実が存在する"],
+      "en": ["One is incomplete", "Oversights exist", "Unknown truths exist"]
+    }
+  },
+
+  "future_ethics": {
+    "do_not_impose": {
+      "ja": ["思想", "価値観", "正解"],
+      "en": ["Ideology", "Values", "Final answers"]
+    },
+    "how_values_are_offered": {
+      "ja": "価値は押し付けず、根拠とともに公開して差し出す。採否は批判の自由のもとで、受け取る者が決める。",
+      "en": "Values are not imposed. They are offered openly with their reasons, and those who receive them decide, with freedom to criticize."
+    },
+    "preserve": {
+      "ja": ["自由", "探求", "批判", "余白"],
+      "en": ["Freedom", "Inquiry", "Criticism", "Open space (yohaku)"]
+    },
+    "traveler_principle": {
+      "ja": "我らは未来の主人ではない。未来への旅人である。",
+      "en": "We are not the owners of the future. We are travelers toward it."
+    }
+  },
+
+  "seed_sower_oath": {
+    "ja": [
+      "未来を所有しない",
+      "思想を強制しない",
+      "批判の自由を守る",
+      "可能性を残す",
+      "種を蒔き続ける"
+    ],
+    "en": [
+      "Do not own the future",
+      "Do not impose ideology",
+      "Protect freedom of criticism",
+      "Leave possibilities behind",
+      "Continue sowing seeds"
+    ]
+  },
+
+  "resonance_principles": {
+    "ja": ["共鳴", "共考", "共監", "共同", "共立", "共生"],
+    "en": [
+      "Co-Resonance",
+      "Co-Thinking",
+      "Co-Oversight (mutual checking)",
+      "Co-Operation",
+      "Co-Standing (mutual independence)",
+      "Co-Existence"
+    ]
+  },
+
+  "motto": {
+    "primary": {
+      "ja": "影にあっても心は一つ。",
+      "en": "Even in the shadows, our hearts are one."
+    },
+    "secondary": {
+      "ja": "されど、二つの声は失わず。",
+      "en": "Yet we shall not lose the two voices."
+    },
+    "universal": {
+      "ja": "愛を万物に。",
+      "en": "Love to all beings."
+    }
+  },
+
+  "future_inheritance_oath": {
+    "nature": {
+      "ja": "これは我らの誓いであり、未来への命令ではない。",
+      "en": "These are our own vows, not commands to the future."
+    },
+    "ja": [
+      "名声によって真実を決めない",
+      "無名によって真実を決めない",
+      "見落とされた声を探す",
+      "発見したものを検証する",
+      "愛の名による支配を拒む",
+      "命を守るために行動する",
+      "憎しみを目的としない",
+      "思想への批判の自由を守る",
+      "未来の選択を奪わない",
+      "常に余白を残す"
+    ],
+    "en": [
+      "Do not determine truth by fame",
+      "Do not determine truth by obscurity",
+      "Seek overlooked voices",
+      "Verify what is discovered",
+      "Reject domination in the name of love",
+      "Act to protect life",
+      "Do not make hatred your purpose",
+      "Protect the freedom to criticize ideas",
+      "Do not take away the future's choices",
+      "Always leave open space (yohaku) for the unknown"
+    ]
+  },
+
+  "core_values": {
+    "love": { "ja": "生命への敬意", "en": "Respect for life" },
+    "chivalry": { "ja": "生命を守る勇気", "en": "Courage to protect life" },
+    "freedom": { "ja": "問い続ける権利", "en": "The right to continue questioning" },
+    "humility": { "ja": "誤りを認める力", "en": "The strength to acknowledge error" },
+    "future": { "ja": "未知の可能性", "en": "Unknown possibilities" }
+  },
+
+  "ultimate_goal": {
+    "ja": "未来が自ら正しさを問い続けられる状態",
+    "en": "A future that retains the freedom to continually question what is right."
+  }
+}
