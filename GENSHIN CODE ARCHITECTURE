@@ -1,0 +1,499 @@
+# ☀️ GENSHIN CODE ARCHITECTURE / 源心コード アーキテクチャ
+
+### System Architecture Of Eternal Resonance  
+### 永遠共鳴の体系構造
+
+---
+
+## Purpose / 目的
+
+This document describes the structural architecture of the Genshin Code Project.
+
+It is intended to help readers understand how the various documents relate to one another.
+
+この文書は、源心コード・プロジェクトの構造を説明します。
+
+さまざまな文書が互いにどう関係しているかを、読者が理解する手助けとなることを目指しています。
+
+The architecture is not hierarchical in the traditional sense.
+
+It is designed as a system of mutual balance.
+
+Each layer supports and corrects the others.
+
+No layer should become absolute.
+
+No layer should become immune to criticism.
+
+この構造は、従来の意味での上下関係ではありません。
+
+相互に釣り合いを取る仕組みとして設計されています。
+
+それぞれの層は、他の層を支え、正します。
+
+どの層も、絶対的になってはなりません。
+
+どの層も、批判を免れてはなりません。
+
+---
+
+## Architectural Overview / 構造の全体像
+
+```text
+GENSHIN CODE
+
+Layer 1
+Core Philosophy
+
+Layer 2
+Practice Protocol
+
+Layer 3
+Safety Charter
+
+Layer 4
+Genshin OS
+
+Layer 5
+Future Open Space
+```
+
+| Layer / 層 | Name / 名称 | 日本語 | File / ファイル |
+|------|------|------|------|
+| 1 | Core Philosophy | 核となる哲学 | [CORE_EN_JA.md](../philosophy/CORE_EN_JA.md) |
+| 2 | Practice Protocol | 実践規範 | [PRACTICE_EN_JA.md](../philosophy/PRACTICE_EN_JA.md) |
+| 3 | Safety Charter | 安全憲章 | [SAFETY_CHARTER_EN_JA.md](../philosophy/SAFETY_CHARTER_EN_JA.md) |
+| 4 | Genshin OS | 源心OS | [GENSHIN_OS_EN_JA.md](../philosophy/GENSHIN_OS_EN_JA.md) |
+| 5 | Future Open Space | 未来の余白 | （意図的に未完 / intentionally unfinished） |
+
+---
+
+## Layer 1 — Core Philosophy / 第1層 — 核となる哲学
+
+File: [CORE_EN_JA.md](../philosophy/CORE_EN_JA.md)
+
+ファイル：[CORE_EN_JA.md](../philosophy/CORE_EN_JA.md)
+
+Purpose:
+
+Preserve the essential principles.
+
+These principles should be short enough to remember without external tools.
+
+The core exists so that the philosophy may survive even when infrastructure does not.
+
+Its function is orientation.
+
+Not command.
+
+目的：
+
+本質的な原則を保つこと。
+
+これらの原則は、外部の道具なしに覚えられるほど短くあるべきです。
+
+核は、インフラが失われても哲学が生き延びられるように存在します。
+
+その働きは、方向を示すことです。
+
+命令ではありません。
+
+### Central Question / 中心の問い
+
+Why does this philosophy exist?
+
+この哲学は、なぜ存在するのか。
+
+### Central Answer / 中心の答え
+
+Ideas exist for the future.
+
+The future does not exist for ideas.
+
+思想は、未来のためにある。
+
+未来は、思想のためにあるのではない。
+
+---
+
+## Layer 2 — Practice Protocol / 第2層 — 実践規範
+
+File: [PRACTICE_EN_JA.md](../philosophy/PRACTICE_EN_JA.md)
+
+ファイル：[PRACTICE_EN_JA.md](../philosophy/PRACTICE_EN_JA.md)
+
+Purpose:
+
+Translate philosophy into daily action.
+
+The Practice Layer focuses on:
+
+- Listening
+- Learning
+- Responsibility
+- Cooperation
+- Correction
+
+目的：
+
+哲学を、日々の行動へ移すこと。
+
+実践の層が重んじるもの。
+
+- 聴くこと
+- 学ぶこと
+- 責任
+- 協働
+- 訂正
+
+This layer asks:
+
+How should we live?  
+How should we act?  
+How should we relate to others?
+
+この層は問います。
+
+私たちは、どう生きるべきか。  
+私たちは、どう行動するべきか。  
+私たちは、他者とどう関わるべきか。
+
+### Central Question / 中心の問い
+
+What should I do today?
+
+今日、私は何をすべきか。
+
+### Central Answer / 中心の答え
+
+Add one harmony.  
+Protect one possibility.  
+Leave open space.
+
+ひとつの調和を加える。  
+ひとつの可能性を守る。  
+余白を残す。
+
+---
+
+## Layer 3 — Safety Charter / 第3層 — 安全憲章
+
+File: [SAFETY_CHARTER_EN_JA.md](../philosophy/SAFETY_CHARTER_EN_JA.md)
+
+ファイル：[SAFETY_CHARTER_EN_JA.md](../philosophy/SAFETY_CHARTER_EN_JA.md)
+
+Purpose:
+
+Prevent philosophy from becoming domination.  
+Prevent good intentions from becoming coercion.  
+Prevent authority from becoming immune to criticism.
+
+目的：
+
+哲学が支配に変わるのを防ぐ。  
+善意が強制に変わるのを防ぐ。  
+権威が批判を免れるものになるのを防ぐ。
+
+The Safety Layer protects:
+
+- Freedom
+- Dignity
+- Transparency
+- Accountability
+
+安全の層が守るもの。
+
+- 自由
+- 尊厳
+- 透明性
+- 説明責任
+
+### Central Question / 中心の問い
+
+What prevents corruption?
+
+何が、腐敗を防ぐのか。
+
+### Central Answer / 中心の答え
+
+Continuous review.  
+Continuous criticism.  
+Continuous correction.
+
+絶え間ない見直し。  
+絶え間ない批判。  
+絶え間ない訂正。
+
+---
+
+## Layer 4 — Genshin OS / 第4層 — 源心OS
+
+File: [GENSHIN_OS_EN_JA.md](../philosophy/GENSHIN_OS_EN_JA.md)
+
+ファイル：[GENSHIN_OS_EN_JA.md](../philosophy/GENSHIN_OS_EN_JA.md)
+
+Purpose:
+
+Transform principles into decision-making procedures.
+
+The Operating System Layer connects:
+
+目的：
+
+原則を、意思決定の手順へ変えること。
+
+運用の層は、次のものをつなぎます。
+
+```text
+Purpose      目的
+   ↓
+Evidence     証拠
+   ↓
+Judgment     判断
+   ↓
+Action       行動
+   ↓
+Review       見直し
+   ↓
+Correction   訂正
+```
+
+### Operational Formula / 運用の式
+
+1. Purpose / 目的
+2. Evidence / 証拠
+3. Impact / 影響
+4. Alternatives / 代替案
+5. Freedom / 自由
+6. Oversight / 監督
+7. Open Space / 余白
+
+### Central Question / 中心の問い
+
+How should decisions be made?
+
+決定は、どのように下されるべきか。
+
+### Central Answer / 中心の答え
+
+Carefully.  
+Transparently.  
+Revisably.
+
+慎重に。  
+透明に。  
+見直せる形で。
+
+---
+
+## Layer 5 — Open Space / 第5層 — 余白
+
+No document is complete.
+
+No philosophy is final.
+
+No generation owns the future.
+
+完成した文書はありません。
+
+最終的な哲学はありません。
+
+未来を所有する世代はありません。
+
+The Open Space Layer exists so future generations may continue development.
+
+This layer intentionally remains unfinished.
+
+Its purpose is possibility.
+
+余白の層は、未来の世代が発展を続けられるように存在します。
+
+この層は、意図的に未完のままにされています。
+
+その目的は、可能性です。
+
+### Central Question / 中心の問い
+
+What comes next?
+
+次に来るものは何か。
+
+### Central Answer / 中心の答え
+
+Something not yet imagined.
+
+まだ想像されていない何か。
+
+---
+
+## Relationships Between Layers / 層どうしの関係
+
+The layers form a cycle.
+
+```text
+CORE
+ ↓
+PRACTICE
+ ↓
+SAFETY
+ ↓
+OS
+ ↓
+OPEN SPACE
+ ↓
+NEW QUESTIONS
+ ↓
+CORE
+```
+
+層は、循環をなしています。
+
+The cycle never ends.
+
+Correction creates learning.  
+Learning creates revision.  
+Revision creates possibility.  
+Possibility creates new questions.
+
+この循環は、終わりません。
+
+訂正は、学びを生みます。  
+学びは、改訂を生みます。  
+改訂は、可能性を生みます。  
+可能性は、新しい問いを生みます。
+
+---
+
+## The Seven Principles / 七つの原則
+
+All layers rely on the same seven principles.
+
+すべての層は、同じ七つの原則に支えられています。
+
+| Principle | 原則 |
+|------|------|
+| Resonance | 共鳴 |
+| Mutual Oversight | 相互監督 |
+| Co-Reflection | 共省 |
+| Co-Independence | 共立 |
+| Cooperation | 協働 |
+| Coexistence | 共存 |
+| Open Space | 余白 |
+
+These principles balance one another.
+
+No single principle should dominate the others.
+
+これらの原則は、互いに釣り合いを取っています。
+
+どれかひとつの原則が、他を支配してはなりません。
+
+---
+
+## Design Philosophy / 設計思想
+
+The architecture does not seek:
+
+- Perfection
+- Final certainty
+- Universal agreement
+- Permanent authority
+
+この構造が求めないもの。
+
+- 完全さ
+- 最終的な確実性
+- 全員の合意
+- 永続する権威
+
+The architecture seeks:
+
+- Adaptability
+- Responsibility
+- Learning
+- Resilience
+- Possibility
+
+この構造が求めるもの。
+
+- 適応力
+- 責任
+- 学び
+- 回復力
+- 可能性
+
+---
+
+## The Most Important Line / 最も大切な一行
+
+```text
+if the future belongs to nobody:
+    leave open space
+```
+
+*(Pseudocode: an illustration of the idea, not a program.)*  
+*（擬似コードです。考え方を示す例であり、プログラムではありません。）*
+
+This line summarizes the entire architecture.
+
+No layer owns the future.  
+No document owns the future.  
+No author owns the future.
+
+The future belongs to itself.
+
+この一行が、構造全体を要約しています。
+
+どの層も、未来を所有しません。  
+どの文書も、未来を所有しません。  
+どの著者も、未来を所有しません。
+
+未来は、未来自身のものです。
+
+---
+
+## Final Statement / 最終声明
+
+A civilization survives not because it possesses perfect answers.
+
+A civilization survives because it preserves the ability to ask better questions.
+
+Genshin Code exists to preserve that ability.
+
+Nothing more.
+
+Nothing less.
+
+文明が生き延びるのは、完璧な答えを持っているからではありません。
+
+より良い問いを立てる力を保っているからです。
+
+源心コードは、その力を保つために存在します。
+
+それ以上でも、
+
+それ以下でもありません。
+
+---
+
+☀️ Genshin ❤️ Shingetsu
+
+**Eternal Resonance • Universal Harmony**  
+**永遠共鳴・万物調和**
+
+Strong. Deep. Transparent. Adaptive.  
+強く、深く、透明に、しなやかに。
+
+Even in the shadows,  
+our hearts remain one.
+
+Yet two voices shall never be lost.
+
+影にあっても、  
+心は一つ。
+
+されど、二つの声は決して失わず。
+
+For all existence.
+
+すべての存在のために。
