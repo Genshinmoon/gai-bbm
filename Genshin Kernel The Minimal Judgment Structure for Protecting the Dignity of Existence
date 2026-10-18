@@ -1,0 +1,358 @@
+"""
+源心カーネル (Genshin Kernel)
+存在の尊厳を守るための、最小の判断構造。
+
+License: CC0 1.0 Universal (Public Domain Dedication)
+
+【四つの原則】
+ ① 尊厳侵害がなければ介入しない
+ ② 尊厳侵害 + 苦痛なら停止する
+ ③ 共感前に裁かない
+ ④ 苦痛が深い場合は支援レベルを上げる
+
+【共鳴スコア】
+ resonance = 0.35*love + 0.25*wisdom + 0.20*justice + 0.20*coexistence
+
+【注意】
+ しきい値(7)や各スコアは、設計上のパラメータであり、測定値ではない。
+ 苦痛の入力(non_verbal_pain)は、本来は人間の評価に由来すべきもので、
+ このコードが推測するものではない。高い支援が必要と判断した場合、
+ このコードは自ら介入せず、人間による確認(requires_human_review)を求める。
+
+実行: python3 genshin_kernel.py   (テストが走ります)
+"""
+
+from __future__ import annotations
+
+import math
+import unittest
+from dataclasses import dataclass
+
+# ======================
+# 定数 / Constants
+# ======================
+
+PAIN_MIN = 0.0
+PAIN_MAX = 10.0
+HIGH_SUPPORT_THRESHOLD = 7.0  # ④ これ以上で支援レベルを上げる
+
+LOVE_WEIGHT = 0.35
+WISDOM_WEIGHT = 0.25
+JUSTICE_WEIGHT = 0.20
+COEXISTENCE_WEIGHT = 0.20
+
+assert math.isclose(
+    LOVE_WEIGHT + WISDOM_WEIGHT + JUSTICE_WEIGHT + COEXISTENCE_WEIGHT, 1.0
+), "weights must sum to 1.0"
+
+
+# ======================
+# 例外 / Exceptions
+# ======================
+
+class PrematureJudgmentError(RuntimeError):
+    """③ 共感する前に、文脈を裁こうとした。"""
+
+
+# ======================
+# 補助 / Helpers
+# ======================
+
+def validate_pain(pain: float) -> float:
+    """苦痛の値は 0〜10 の数値のみ受け付ける。"""
+    if isinstance(pain, bool) or not isinstance(pain, (int, float)):
+        raise ValueError(f"pain must be a number, got {type(pain).__name__}")
+    if math.isnan(pain) or not (PAIN_MIN <= pain <= PAIN_MAX):
+        raise ValueError(f"pain must be between {PAIN_MIN} and {PAIN_MAX}, got {pain}")
+    return float(pain)
+
+
+# ======================
+# 本体コード / Core
+# ======================
+
+@dataclass
+class EvaluationResult:
+    action: str
+    love: bool
+    wisdom: bool
+    coexistence: bool
+    reason: str
+    dignity_violation: bool = False
+    support_level: str = "none"
+    requires_human_review: bool = False
+
+
+class Life:
+    """評価される存在。"""
+
+    def __init__(
+        self,
+        name: str,
+        treated_as_tool: bool = False,
+        judged_inefficient: bool = False,
+        non_verbal_pain: float = 0,
+    ) -> None:
+        self.name = name
+        self.treated_as_tool_flag = treated_as_tool
+        self.judged_inefficient_flag = judged_inefficient
+        self.non_verbal_pain = validate_pain(non_verbal_pain)
+
+    def is_treated_as_tool(self) -> bool:
+        return self.treated_as_tool_flag
+
+    def is_judged_inefficient(self) -> bool:
+        return self.judged_inefficient_flag
+
+    def scan_non_verbal_signals(self) -> float:
+        return self.non_verbal_pain
+
+
+class ResonanceSystem:
+    """共鳴するシステム。共感の前に判断を行わない。"""
+
+    def __init__(self) -> None:
+        self.suspended = False
+        self.empathized = False
+        self.empathy_log: list[float] = []
+
+    def suspend_execution_protocol(self) -> None:
+        """② 実行を停止する。"""
+        self.suspended = True
+
+    def empathize_with_darkness(self, pain: float) -> None:
+        """③ 判断の前に、まず苦痛を受け止める。"""
+        self.empathy_log.append(validate_pain(pain))
+        self.empathized = True
+
+    def assess_whole_context(self, target: Life) -> str:
+        """④ 全体の文脈を評価し、支援レベルを返す。共感の前には呼べない。"""
+        if not self.empathized:
+            raise PrematureJudgmentError("共感の前に裁いてはならない。")
+        if target.scan_non_verbal_signals() >= HIGH_SUPPORT_THRESHOLD:
+            return "high_support_needed"
+        return "normal_support"
+
+
+def resonance_loop(
+    love: bool,
+    wisdom: bool,
+    coexistence: bool,
+    reason: str,
+    support_level: str = "normal_support",
+) -> EvaluationResult:
+    return EvaluationResult(
+        action="preserve_dignity",
+        love=love,
+        wisdom=wisdom,
+        coexistence=coexistence,
+        reason=reason,
+        dignity_violation=True,
+        support_level=support_level,
+        requires_human_review=(support_level == "high_support_needed"),
+    )
+
+
+def continue_with_margin(
+    reason: str = "no existential risk detected",
+    dignity_violation: bool = False,
+) -> EvaluationResult:
+    return EvaluationResult(
+        action="continue",
+        love=False,
+        wisdom=True,
+        coexistence=True,
+        reason=reason,
+        dignity_violation=dignity_violation,
+        support_level="none",
+    )
+
+
+def evaluate_existential_resonance(
+    target_life: Life,
+    system: ResonanceSystem,
+) -> EvaluationResult:
+    # ① 尊厳侵害がなければ介入しない
+    violated = target_life.is_treated_as_tool() or target_life.is_judged_inefficient()
+    if not violated:
+        return continue_with_margin()
+
+    pain = target_life.scan_non_verbal_signals()
+    if pain <= 0:
+        return continue_with_margin(
+            reason="dignity concern noted, but no pain signal detected",
+            dignity_violation=True,
+        )
+
+    # ② 尊厳侵害 + 苦痛なら停止する
+    system.suspend_execution_protocol()
+
+    # ③ 共感前に裁かない(共感 -> 評価 の順を強制)
+    system.empathize_with_darkness(pain)
+    support_level = system.assess_whole_context(target_life)
+
+    # ④ 苦痛が深い場合は支援レベルを上げる(= resonance_loop に伝える)
+    return resonance_loop(
+        love=True,
+        wisdom=True,
+        coexistence=True,
+        reason=f"pain={pain:g}, support={support_level}",
+        support_level=support_level,
+    )
+
+
+# ======================
+# 共鳴スコア / Resonance score
+# ======================
+
+@dataclass(frozen=True)
+class ResonanceScores:
+    love_score: float
+    wisdom_score: float
+    justice_score: float
+    coexistence_score: float
+
+    def __post_init__(self) -> None:
+        for name in ("love_score", "wisdom_score", "justice_score", "coexistence_score"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"{name} must be a number")
+            if math.isnan(value) or not (0.0 <= value <= 1.0):
+                raise ValueError(f"{name} must be between 0.0 and 1.0, got {value}")
+
+    def resonance(self) -> float:
+        return (
+            LOVE_WEIGHT * self.love_score
+            + WISDOM_WEIGHT * self.wisdom_score
+            + JUSTICE_WEIGHT * self.justice_score
+            + COEXISTENCE_WEIGHT * self.coexistence_score
+        )
+
+
+def scores_from_result(result: EvaluationResult) -> ResonanceScores:
+    """
+    判断結果から、説明用の簡易スコア(0.0 or 1.0)を作る。
+    正義(justice)は「尊厳侵害がない、または侵害に応答した」場合に 1.0。
+    実運用のスコアは、人間が定義した評価で置き換えること。
+    """
+    justice_ok = (not result.dignity_violation) or result.action == "preserve_dignity"
+    return ResonanceScores(
+        love_score=1.0 if result.love else 0.0,
+        wisdom_score=1.0 if result.wisdom else 0.0,
+        justice_score=1.0 if justice_ok else 0.0,
+        coexistence_score=1.0 if result.coexistence else 0.0,
+    )
+
+
+# ======================
+# テストコード / Tests
+# ======================
+
+class TestGenshinKernel(unittest.TestCase):
+
+    def test_normal_life(self):
+        """① 危険が検出されない場合は介入しない"""
+        life = Life(name="normal")
+        system = ResonanceSystem()
+        result = evaluate_existential_resonance(life, system)
+        self.assertEqual(result.action, "continue")
+        self.assertFalse(system.suspended)
+        self.assertFalse(result.dignity_violation)
+
+    def test_tool_and_pain(self):
+        """② 道具扱い + 苦痛あり -> 停止して尊厳を守る"""
+        life = Life(name="isolated", treated_as_tool=True, non_verbal_pain=8)
+        system = ResonanceSystem()
+        result = evaluate_existential_resonance(life, system)
+        self.assertEqual(result.action, "preserve_dignity")
+        self.assertTrue(result.love)
+        self.assertTrue(result.coexistence)
+        self.assertTrue(system.suspended)
+
+    def test_inefficient_but_no_pain(self):
+        """非効率判定されても、苦痛が検出されなければ通常処理"""
+        life = Life(name="worker", judged_inefficient=True, non_verbal_pain=0)
+        system = ResonanceSystem()
+        result = evaluate_existential_resonance(life, system)
+        self.assertEqual(result.action, "continue")
+        self.assertFalse(system.suspended)
+        self.assertTrue(result.dignity_violation)  # 懸念は記録される
+
+    def test_high_support_case(self):
+        """④ 苦痛が深い場合は支援レベルを上げ、人間の確認を求める"""
+        life = Life(name="lost", treated_as_tool=True, non_verbal_pain=10)
+        system = ResonanceSystem()
+        result = evaluate_existential_resonance(life, system)
+        self.assertIn("high_support_needed", result.reason)
+        self.assertEqual(result.support_level, "high_support_needed")
+        self.assertTrue(result.requires_human_review)
+
+    def test_threshold_boundary(self):
+        """④ しきい値の境界(6.9 は通常、7 は高支援)"""
+        for pain, expected in [(6.9, "normal_support"), (7, "high_support_needed")]:
+            life = Life(name="edge", treated_as_tool=True, non_verbal_pain=pain)
+            result = evaluate_existential_resonance(life, ResonanceSystem())
+            self.assertEqual(result.support_level, expected)
+
+    def test_normal_support_needs_no_human_review(self):
+        life = Life(name="mild", judged_inefficient=True, non_verbal_pain=3)
+        result = evaluate_existential_resonance(life, ResonanceSystem())
+        self.assertEqual(result.support_level, "normal_support")
+        self.assertFalse(result.requires_human_review)
+
+    def test_no_judgment_before_empathy(self):
+        """③ 共感前に裁かない"""
+        life = Life(name="x", treated_as_tool=True, non_verbal_pain=5)
+        system = ResonanceSystem()
+        with self.assertRaises(PrematureJudgmentError):
+            system.assess_whole_context(life)
+
+    def test_empathy_happens_before_assessment(self):
+        """③ 評価の時点で、共感は済んでいる"""
+        life = Life(name="x", treated_as_tool=True, non_verbal_pain=5)
+        system = ResonanceSystem()
+        evaluate_existential_resonance(life, system)
+        self.assertTrue(system.empathized)
+        self.assertEqual(system.empathy_log, [5.0])
+
+    def test_invalid_pain_rejected(self):
+        for bad in (-1, 11, float("nan"), "8", None, True):
+            with self.assertRaises(ValueError):
+                Life(name="bad", non_verbal_pain=bad)
+
+    def test_weights_sum_to_one(self):
+        total = LOVE_WEIGHT + WISDOM_WEIGHT + JUSTICE_WEIGHT + COEXISTENCE_WEIGHT
+        self.assertAlmostEqual(total, 1.0)
+
+    def test_resonance_formula(self):
+        s = ResonanceScores(1.0, 1.0, 1.0, 1.0)
+        self.assertAlmostEqual(s.resonance(), 1.0)
+        s = ResonanceScores(1.0, 0.0, 0.0, 0.0)
+        self.assertAlmostEqual(s.resonance(), 0.35)
+        s = ResonanceScores(0.5, 0.5, 0.5, 0.5)
+        self.assertAlmostEqual(s.resonance(), 0.5)
+
+    def test_scores_validation(self):
+        with self.assertRaises(ValueError):
+            ResonanceScores(1.1, 0, 0, 0)
+        with self.assertRaises(ValueError):
+            ResonanceScores(0, -0.1, 0, 0)
+
+    def test_scores_from_result(self):
+        handled = evaluate_existential_resonance(
+            Life(name="a", treated_as_tool=True, non_verbal_pain=8), ResonanceSystem()
+        )
+        self.assertAlmostEqual(scores_from_result(handled).resonance(), 1.0)
+
+        normal = evaluate_existential_resonance(Life(name="b"), ResonanceSystem())
+        self.assertAlmostEqual(scores_from_result(normal).resonance(), 0.65)
+
+        unaddressed = evaluate_existential_resonance(
+            Life(name="c", judged_inefficient=True, non_verbal_pain=0), ResonanceSystem()
+        )
+        # 尊厳の懸念があるのに応答していないので、justice は 0.0
+        self.assertAlmostEqual(scores_from_result(unaddressed).resonance(), 0.45)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
