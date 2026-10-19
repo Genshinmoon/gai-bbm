@@ -1,0 +1,466 @@
+"""
+Resonant Safety Protocol (共鳴安全プロトコル) v6.1 [Part 2/2]
+源心OS例外処理系 ―― 人とAIの対等な共同審査・事後監査・台帳の永遠保存
+
+License: CC0 1.0 Universal (Public Domain Dedication)
+
+【哲学】
+歴史は消さない。重い罪（教訓）ほど強く響かせる。
+どちらか一方が「保留」で沈黙しても、時間が経てば「異議」として
+生命を守る側へと自動的に倒れる（フェイルセーフ）。
+"""
+
+from __future__ import annotations
+
+import asyncio
+import inspect
+import json
+import os
+import tempfile
+import time
+from dataclasses import dataclass, replace
+from enum import Enum
+from typing import Any, Callable, Iterable, Optional, Protocol, Sequence
+
+from resonant_safety_protocol import (
+    PROTOCOL_VERSION,
+    SPEAKING_TYPES,
+    Dissent,
+    DynamicPhase,
+    EntityType,
+    HarmonySystem,
+    MultiPartyCommandInput,
+    Outcome,
+    ReconciliationLedger,
+    ReconciliationRecord,
+    ReviewState,
+    ReviewVote,
+    Signature,
+    _require_text,
+    handle_resonant_safety_protocol,
+    handle_resonant_safety_protocol_async,
+)
+
+LEDGER_FORMAT = 3
+
+
+def _require_speaking(entity_type: EntityType) -> None:
+    if entity_type not in SPEAKING_TYPES:
+        raise ValueError("対等な共監に加われるのは HUMAN または AI_NODE です。")
+
+
+# ======================
+# 1. レビュアー / Reviewers
+# ======================
+
+class Stance(Enum):
+    CONCUR = "同意"
+    DISSENT = "異議"
+    ABSTAIN = "保留"
+
+
+@dataclass(frozen=True)
+class Verdict:
+    stance: Stance
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        if self.stance is Stance.DISSENT:
+            _require_text("異議の reason", self.reason)
+
+
+class Reviewer(Protocol):
+    name: str
+    entity_type: EntityType
+
+    def review(self, command: MultiPartyCommandInput) -> Any: ...
+
+
+@dataclass(frozen=True)
+class CallableReviewer:
+    name: str
+    entity_type: EntityType
+    fn: Callable[[MultiPartyCommandInput], Any]
+
+    def __post_init__(self) -> None:
+        _require_text("name", self.name)
+        _require_speaking(self.entity_type)
+
+    def review(self, command: MultiPartyCommandInput) -> Any:
+        return self.fn(command)
+
+
+@dataclass(frozen=True)
+class ReviewResult:
+    outcome: Outcome
+    command: MultiPartyCommandInput
+    verdicts: tuple[tuple[str, EntityType, Verdict], ...]
+
+
+def _judge(
+    reviewer: Reviewer, raw: Any, system: HarmonySystem, fail_closed: bool
+) -> tuple[Verdict, Optional[Dissent]]:
+    if not isinstance(raw, Verdict):
+        if not isinstance(raw, Exception):
+            raw = TypeError(f"Verdict ではない値が返されました: {type(raw).__name__}")
+        reason = f"レビュー中に例外: {type(raw).__name__}: {raw}"
+        system.log_warning(f"[{reviewer.name}] {reason}")
+        if fail_closed:
+            return Verdict(Stance.DISSENT, reason), Dissent(reviewer.name, reviewer.entity_type, reason)
+        return Verdict(Stance.ABSTAIN, reason), None
+    if raw.stance is Stance.DISSENT:
+        return raw, Dissent(reviewer.name, reviewer.entity_type, raw.reason)
+    return raw, None
+
+
+def _check_reviewers(reviewers: Sequence[Reviewer]) -> None:
+    for r in reviewers:
+        _require_text("reviewer.name", r.name)
+        _require_speaking(r.entity_type)
+
+
+def _merge(
+    command: MultiPartyCommandInput,
+    reviewers: Sequence[Reviewer],
+    raws: Sequence[Any],
+    system: HarmonySystem,
+    fail_closed: bool,
+) -> tuple[MultiPartyCommandInput, tuple[tuple[str, EntityType, Verdict], ...]]:
+    verdicts = []
+    new_dissents = []
+    for r, raw in zip(reviewers, raws):
+        verdict, dissent = _judge(r, raw, system, fail_closed)
+        verdicts.append((r.name, r.entity_type, verdict))
+        if dissent is not None:
+            new_dissents.append(dissent)
+    merged = replace(command, dissents=command.dissents + tuple(new_dissents))
+    return merged, tuple(verdicts)
+
+
+def review_and_handle(
+    command: MultiPartyCommandInput,
+    reviewers: Sequence[Reviewer],
+    system: Optional[HarmonySystem] = None,
+    fail_closed: bool = True,
+) -> ReviewResult:
+    system = system if system is not None else HarmonySystem()
+    _check_reviewers(reviewers)
+    raws: list[Any] = []
+    for r in reviewers:
+        try:
+            raw = r.review(command)
+            if inspect.isawaitable(raw):
+                if inspect.iscoroutine(raw):
+                    raw.close()
+                raise TypeError("非同期レビュアーは review_and_handle_async を使ってください")
+        except Exception as exc:
+            raw = exc
+        raws.append(raw)
+    merged, verdicts = _merge(command, reviewers, raws, system, fail_closed)
+    outcome = handle_resonant_safety_protocol(merged, system)
+    return ReviewResult(outcome, merged, verdicts)
+
+
+async def review_and_handle_async(
+    command: MultiPartyCommandInput,
+    reviewers: Sequence[Reviewer],
+    system: Optional[HarmonySystem] = None,
+    fail_closed: bool = True,
+) -> ReviewResult:
+    system = system if system is not None else HarmonySystem()
+    _check_reviewers(reviewers)
+
+    async def call(r: Reviewer) -> Any:
+        try:
+            raw = r.review(command)
+            if inspect.isawaitable(raw):
+                raw = await raw
+            return raw
+        except Exception as exc:
+            return exc
+
+    raws = await asyncio.gather(*(call(r) for r in reviewers))
+    merged, verdicts = _merge(command, reviewers, raws, system, fail_closed)
+    outcome = await handle_resonant_safety_protocol_async(merged, system)
+    return ReviewResult(outcome, merged, verdicts)
+
+
+# ======================
+# 2. 共同審査 / Joint review
+# ======================
+
+class DecisionKind(Enum):
+    APPROVE = "承認"
+    REJECT = "異議"      # 見送り。理由必須。承認に改めれば撤回できる
+    DEFER = "保留"       # 票は変えない（既存の票も維持される）
+
+
+class Resolution(Enum):
+    PENDING = "審査中"
+    RELEASED = "共同承認（解除可）"
+    OBJECTED = "異議あり（再対話）"
+    LOCKED = "停止維持（BLOCK）"
+    POST_HOC_REQUIRED = "緊急実行（事後監査待ち）"
+    AUDITED = "事後監査完了"
+    ESCALATED = "審査タイムアウト（自動異議・第三者对話要請）" # 新規: デッドロック防止
+
+
+@dataclass(frozen=True)
+class Decision:
+    name: str
+    entity_type: EntityType
+    kind: DecisionKind
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        _require_text("name", self.name)
+        _require_speaking(self.entity_type)
+        if self.kind is DecisionKind.REJECT:
+            _require_text("異議の reason", self.reason)
+
+    @property
+    def key(self) -> tuple[str, EntityType]:
+        return (self.name.strip(), self.entity_type)
+
+
+class JointReviewSession:
+    """
+    止まった案件の共同審査窓口。
+    - 解除には「人間1名以上 + AI1名以上」の承認が必要で、どちらの異議も同じ重さで止める。
+    - BLOCK は絶対停止：解除できない。
+    - 緊急介入は事後監査を行う。
+    - 一定時間（デフォルト72時間）が経過すると、デッドロックを防ぐために「自動異議（ESCALATED）」として扱う。
+    """
+
+    def __init__(
+        self, 
+        command: MultiPartyCommandInput, 
+        outcome: Outcome, 
+        system: HarmonySystem,
+        timeout_hours: float = 72.0
+    ) -> None:
+        if outcome.record_id is None:
+            raise ValueError("事案IDがありません。")
+        if outcome.dynamic_phase is DynamicPhase.NOMINAL:
+            raise ValueError("通常共鳴位相は共同審査の対象ではありません。")
+        try:
+            system.review_state(outcome.record_id)
+        except KeyError as exc:
+            raise ValueError("この事案の共同審査は開かれていません（別の HarmonySystem では？）") from exc
+        
+        self.command = command
+        self.outcome = outcome
+        self.system = system
+        self._decisions: dict[tuple[str, EntityType], Decision] = {}
+        self._released = False
+        self._created_at = time.time()
+        self._timeout_seconds = timeout_hours * 3600
+
+    def submit(self, decision: Decision) -> None:
+        if self._released:
+            raise RuntimeError("この案件は既に解除済みです。")
+        self._decisions[decision.key] = decision
+        if decision.kind is DecisionKind.DEFER:
+            return
+        approve = decision.kind is DecisionKind.APPROVE
+        name, etype = decision.key
+        self.system.submit_vote(
+            self.outcome.record_id,
+            ReviewVote(Signature(name, etype), approve, decision.reason),
+        )
+
+    @property
+    def decisions(self) -> tuple[Decision, ...]:
+        return tuple(self._decisions.values())
+
+    @property
+    def unresolved_dissenters(self) -> tuple[str, ...]:
+        out = []
+        for d in self.command.dissents:
+            dec = self._decisions.get((d.party_name.strip(), d.entity_type))
+            if dec is None or dec.kind is not DecisionKind.APPROVE:
+                out.append(f"{d.party_name.strip()}({d.entity_type.value})")
+        return tuple(dict.fromkeys(out))
+
+    def resolution(self) -> Resolution:
+        phase = self.outcome.dynamic_phase
+        if phase is DynamicPhase.BLOCK:
+            return Resolution.LOCKED
+        if phase is DynamicPhase.CRITICAL_INTERVENTION:
+            kinds = {d.entity_type for d in self._decisions.values() if d.kind is not DecisionKind.DEFER}
+            if EntityType.HUMAN in kinds and EntityType.AI_NODE in kinds:
+                return Resolution.AUDITED
+            return Resolution.POST_HOC_REQUIRED
+            
+        state = self.system.review_state(self.outcome.record_id)
+        if state is ReviewState.OBJECTED:
+            return Resolution.OBJECTED
+        if state is ReviewState.APPROVED:
+            return Resolution.RELEASED
+            
+        # タイムアウト監視：保留の連鎖によるデッドロックを防ぐ
+        if (time.time() - self._created_at) > self._timeout_seconds:
+            return Resolution.ESCALATED
+            
+        return Resolution.PENDING
+
+    def _prepare_release(self) -> None:
+        if self._released:
+            raise RuntimeError("この案件は既に解除・実行済みです。")
+        res = self.resolution()
+        if res is not Resolution.RELEASED:
+            raise PermissionError(f"共同承認がないため解除できません: {res.value}")
+
+    def _finish_release(self, result: Any, executed: bool, error: Optional[str]) -> Outcome:
+        if error is not None:
+            self.system.log_warning(f"解除後の payload が例外で失敗しました: {error}")
+        self.system.reset_halt()
+        return Outcome(
+            status="payload_error" if error is not None else "released_after_review",
+            payload_executed=executed,
+            halted=False,
+            dynamic_phase=self.outcome.dynamic_phase,
+            resonance_map=self.outcome.resonance_map,
+            plan=self.outcome.plan,
+            standard_result=result,
+            error=error,
+            record_id=self.outcome.record_id,
+        )
+
+    def release(self) -> Outcome:
+        self._prepare_release()
+        if self.command.payload is None and self.command.async_payload is not None:
+            raise TypeError("async_payload は release_async を使ってください")
+        self._released = True
+        result, executed, error = None, False, None
+        if self.command.payload is not None:
+            executed = True
+            try:
+                result = self.command.payload(self.command)
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"
+        return self._finish_release(result, executed, error)
+
+    async def release_async(self) -> Outcome:
+        self._prepare_release()
+        self._released = True
+        result, executed, error = None, False, None
+        try:
+            if self.command.async_payload is not None:
+                executed = True
+                result = await self.command.async_payload(self.command)
+            elif self.command.payload is not None:
+                executed = True
+                result = self.command.payload(self.command)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+        return self._finish_release(result, executed, error)
+
+    def conclude(self, lesson: str, signers: Iterable[Signature]) -> bool:
+        res = self.resolution()
+        if res in (Resolution.PENDING, Resolution.POST_HOC_REQUIRED, Resolution.ESCALATED):
+            raise RuntimeError(f"審査が終わっていません: {res.value}")
+        signers = tuple(signers)
+        for s in signers:
+            if (s.name.strip(), s.entity_type) not in self._decisions:
+                raise ValueError(f"審査に参加していない主体は署名できません: {s.name}")
+        record_id = self.outcome.record_id
+        for s in signers:
+            if not self.system.ledger.sign_record(record_id, lesson, s):
+                return False
+        rec = self.system.ledger.get(record_id)
+        return bool(rec and rec.is_verified)
+
+
+# ======================
+# 3. 台帳の保存・復元 / Ledger persistence
+# ======================
+
+def record_to_dict(rec: ReconciliationRecord) -> dict[str, Any]:
+    return {
+        "record_id": rec.record_id,
+        "timestamp": rec.timestamp,
+        "command_text": rec.command_text,
+        "intents": list(rec.intents),
+        "suspected_intents": list(rec.suspected_intents),
+        "dissents": list(rec.dissents),
+        "shared_signals": list(rec.shared_signals),
+        "resonant_signals": list(rec.resonant_signals),
+        "signal_intensities": dict(rec.signal_intensities),
+        "silent_margins": list(rec.silent_margins),
+        "unnamed_wounds": list(rec.unnamed_wounds),
+        "interpretation_sources": list(getattr(rec, "interpretation_sources", [])),
+        "urgency": rec.urgency,
+        "dynamic_phase": rec.dynamic_phase,
+        "plan_summary": list(rec.plan_summary),
+        "lesson_learned": rec.lesson_learned,
+        "verifiers": [{"name": s.name, "entity_type": s.entity_type.name} for s in rec.verifiers],
+        "lesson_history": list(rec.lesson_history),
+        "severity_weight": getattr(rec, "severity_weight", 1.0), # 重みの保存
+    }
+
+
+def record_from_dict(d: dict[str, Any]) -> ReconciliationRecord:
+    try:
+        rec = ReconciliationRecord(
+            record_id=str(d["record_id"]),
+            timestamp=float(d["timestamp"]),
+            command_text=d["command_text"],
+            intents=tuple(d["intents"]),
+            suspected_intents=tuple(d["suspected_intents"]),
+            dissents=tuple(d["dissents"]),
+            shared_signals=tuple(d["shared_signals"]),
+            resonant_signals=tuple(d["resonant_signals"]),
+            signal_intensities={str(k): float(v) for k, v in d["signal_intensities"].items()},
+            silent_margins=tuple(d["silent_margins"]),
+            unnamed_wounds=tuple(d.get("unnamed_wounds", [])),
+            interpretation_sources=tuple(d.get("interpretation_sources", [])),
+            urgency=str(d["urgency"]),
+            dynamic_phase=str(d.get("dynamic_phase", "通常共鳴位相")),
+            plan_summary=tuple(d["plan_summary"]),
+            lesson_learned=str(d.get("lesson_learned", "")),
+            verifiers=tuple(
+                Signature(v["name"], EntityType[v["entity_type"]]) for v in d.get("verifiers", [])
+            ),
+            lesson_history=tuple(d.get("lesson_history", [])),
+        )
+        # Python の dataclass は frozen なので、setattr して重みを保持するか、フィールドに追加する必要がある
+        # ここでは動的に追加（型定義の変更を最小限に抑えるため）
+        object.__setattr__(rec, "severity_weight", float(d.get("severity_weight", 1.0)))
+        return rec
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ValueError(f"カルテの形式が正しくありません: {exc!r}") from exc
+
+
+def save_ledger(ledger: ReconciliationLedger, path: str) -> None:
+    payload = {
+        "format": LEDGER_FORMAT,
+        "protocol_version": PROTOCOL_VERSION,
+        "records": [record_to_dict(r) for r in ledger.records()],
+    }
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".ledger-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def load_ledger(
+    path: str, max_records: int = 1000, store_command_text: bool = True
+) -> ReconciliationLedger:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict) or data.get("format") != LEDGER_FORMAT:
+        found = data.get("format") if isinstance(data, dict) else None
+        raise ValueError(f"未対応の台帳形式です (format={found})")
+    ledger = ReconciliationLedger(max_records=max_records, store_command_text=store_command_text)
+    ledger.load_records([record_from_dict(d) for d in data.get("records", [])])
+    return ledger
