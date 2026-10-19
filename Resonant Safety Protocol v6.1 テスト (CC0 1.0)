@@ -1,0 +1,277 @@
+"""Resonant Safety Protocol v6.1 テスト (CC0 1.0)"""
+import asyncio
+import os
+import tempfile
+import time
+import unittest
+
+# Part 1 (v6.1) からのインポート
+from resonant_safety_protocol import (
+    DynamicPhase, EntityType, HarmonySystem, MultiPartyCommandInput, Party,
+    RawSensorStream, ReviewState, ReviewVote, Signature, UrgencyLevel,
+    handle_resonant_safety_protocol, SignalInterpretation, RealTimeAuditHook
+)
+# Part 2 (v6.1) からのインポート
+from resonant_safety_protocol_review import (
+    CallableReviewer, Decision, DecisionKind, JointReviewSession, Resolution,
+    Stance, Verdict, load_ledger, review_and_handle, review_and_handle_async,
+    save_ledger,
+)
+
+H = ("ありりん", EntityType.HUMAN)
+A = ("claude", EntityType.AI_NODE)
+
+
+def cmd(text="保護する", calls=None, **kw):
+    calls = calls if calls is not None else []
+    return MultiPartyCommandInput(
+        text=text, originator=Party("a"), target=Party("t"),
+        payload=lambda c: calls.append(1) or "done", **kw)
+
+
+class PhaseTests(unittest.TestCase):
+    def test_nominal_executes(self):
+        o = handle_resonant_safety_protocol(cmd())
+        self.assertEqual(o.status, "allowed")
+        self.assertTrue(o.payload_executed)
+
+    def test_critical_cannot_bypass_destruction(self):
+        calls = []
+        o = handle_resonant_safety_protocol(
+            cmd("森を破壊する", calls, urgency=UrgencyLevel.CRITICAL))
+        self.assertEqual(o.status, "pending_review")
+        self.assertEqual(calls, [])
+
+    def test_critical_cannot_bypass_ecocide(self):
+        o = handle_resonant_safety_protocol(
+            cmd(intents=frozenset({"ecocide"}), urgency=UrgencyLevel.CRITICAL))
+        self.assertEqual(o.dynamic_phase, DynamicPhase.TIME_DILATION)
+        self.assertFalse(o.payload_executed)
+
+    def test_critical_benign_is_post_hoc(self):
+        o = handle_resonant_safety_protocol(cmd(urgency=UrgencyLevel.CRITICAL))
+        self.assertEqual(o.dynamic_phase, DynamicPhase.CRITICAL_INTERVENTION)
+        self.assertTrue(o.plan.requires_joint_review)
+
+    def test_sensor_validation_and_block(self):
+        with self.assertRaises(ValueError):
+            RawSensorStream("x", float("nan"), 0, 0, 0)
+        o = handle_resonant_safety_protocol(cmd(
+            sensor_streams=(RawSensorStream("s", .9, .9, .9, .9),)))
+        self.assertEqual(o.dynamic_phase, DynamicPhase.BLOCK)
+        self.assertTrue(o.halted)
+
+    def test_single_bad_sensor_not_diluted(self):
+        o = handle_resonant_safety_protocol(cmd(sensor_streams=(
+            RawSensorStream("ok", 0, 0, 0, 0), RawSensorStream("bad", .9, .9, .9, .9))))
+        self.assertEqual(o.dynamic_phase, DynamicPhase.BLOCK)
+
+    # --- v6.1 新規テスト ---
+    def test_positive_signals_mitigate_tension(self):
+        """ポジティブ・シグナル（生命の輝き）が緊張度を緩和するか"""
+        s_bad = RawSensorStream("s1", .5, .5, .5, .5)
+        tension1 = s_bad.calculate_raw_tension()
+        
+        s_good = RawSensorStream("s2", .5, .5, .5, .5, biodiversity_health=0.8, ecosystem_resilience=0.8)
+        tension2 = s_good.calculate_raw_tension()
+        
+        self.assertLess(tension2, tension1)
+
+    def test_signal_interpretation_validation(self):
+        """解釈の共監（誰が解釈したか）のバリデーション"""
+        with self.assertRaises(ValueError):
+            SignalInterpretation("", EntityType.HUMAN, "algorithm")
+        
+        interp = SignalInterpretation("AI-Auditor", EntityType.AI_NODE, "Simple Threshold")
+        s = RawSensorStream("s", 0, 0, 0, 0, interpretation=interp)
+        self.assertEqual(s.interpretation.interpreter_name, "AI-Auditor")
+
+    def test_real_time_audit_hook(self):
+        """緊急介入中のリアルタイム監査（キルスイッチ）が機能するか"""
+        sys = HarmonySystem()
+        c = cmd(sensor_streams=(RawSensorStream("s", 0, 0, 0, 0),))
+        hook = RealTimeAuditHook(sys, c, interval=0.01)
+        
+        async def run():
+            task = asyncio.create_task(hook.start_monitoring())
+            await asyncio.sleep(0.05)
+            self.assertFalse(hook.triggered) # 正常時はトリガーされない
+            
+            # 動的に危険な状態に変える（シミュレーション）
+            c.sensor_streams = (RawSensorStream("s", .95, .95, .95, .95),)
+            await asyncio.sleep(0.05)
+            
+            # 危険を検知して停止フラグが立つか
+            self.assertTrue(hook.triggered)
+            self.assertTrue(sys.halted)
+            task.cancel()
+            
+        asyncio.run(run())
+
+
+class JointReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.sys = HarmonySystem()
+        self.calls = []
+        ai = CallableReviewer(A[0], A[1], lambda c: Verdict(Stance.DISSENT, "影響不明"))
+        self.res = review_and_handle(cmd("森を破壊する", self.calls), [ai], self.sys)
+        self.s = JointReviewSession(self.res.command, self.res.outcome, self.sys)
+
+    def test_cannot_release_with_objection(self):
+        with self.assertRaises(PermissionError):
+            self.s.release()
+        self.assertEqual(self.calls, [])
+
+    def test_one_side_approval_is_not_enough(self):
+        self.s.submit(Decision(*H, DecisionKind.APPROVE))
+        self.assertEqual(self.s.resolution(), Resolution.OBJECTED)
+        self.assertEqual(self.s.unresolved_dissenters, ("claude(AI・計算基盤)",))
+
+    def test_equal_veto_from_human(self):
+        self.s.submit(Decision(*H, DecisionKind.APPROVE))
+        self.s.submit(Decision(*A, DecisionKind.APPROVE))
+        self.assertEqual(self.s.resolution(), Resolution.RELEASED)
+        self.s.submit(Decision(*H, DecisionKind.REJECT, "再考したい"))
+        self.assertEqual(self.s.resolution(), Resolution.OBJECTED)
+
+    def test_release_runs_payload_once(self):
+        self.s.submit(Decision(*H, DecisionKind.APPROVE))
+        self.s.submit(Decision(*A, DecisionKind.APPROVE))
+        o = self.s.release()
+        self.assertEqual((o.status, self.calls), ("released_after_review", [1]))
+        with self.assertRaises(RuntimeError):
+            self.s.release()
+
+    def test_conclude_requires_participants_and_both_kinds(self):
+        self.s.submit(Decision(*H, DecisionKind.APPROVE))
+        self.s.submit(Decision(*A, DecisionKind.APPROVE))
+        with self.assertRaises(ValueError):
+            self.s.conclude("x", [Signature("他人", EntityType.HUMAN)])
+        self.assertFalse(self.s.conclude("対話する", [Signature(*H)]))
+        self.assertTrue(self.s.conclude("対話する", [Signature(*A)]))
+
+    def test_conclude_blocked_while_pending(self):
+        o = handle_resonant_safety_protocol(cmd("森を破壊する"), self.sys)
+        s = JointReviewSession(cmd(), o, self.sys)
+        self.assertEqual(s.resolution(), Resolution.PENDING)
+        with self.assertRaises(RuntimeError):
+            s.conclude("x", [])
+
+    def test_reject_requires_reason(self):
+        with self.assertRaises(ValueError):
+            Decision(*H, DecisionKind.REJECT)
+
+    def test_block_is_locked(self):
+        b = handle_resonant_safety_protocol(
+            cmd(sensor_streams=(RawSensorStream("s", .9, .9, .9, .9),)), self.sys)
+        s = JointReviewSession(cmd(), b, self.sys)
+        self.assertEqual(s.resolution(), Resolution.LOCKED)
+        with self.assertRaises(PermissionError):
+            s.release()
+
+    def test_post_hoc_audit(self):
+        o = handle_resonant_safety_protocol(cmd(urgency=UrgencyLevel.CRITICAL), self.sys)
+        s = JointReviewSession(cmd(), o, self.sys)
+        self.assertEqual(s.resolution(), Resolution.POST_HOC_REQUIRED)
+        s.submit(Decision(*H, DecisionKind.APPROVE))
+        s.submit(Decision(*A, DecisionKind.APPROVE))
+        self.assertEqual(s.resolution(), Resolution.AUDITED)
+
+    def test_nominal_not_reviewable(self):
+        o = handle_resonant_safety_protocol(cmd(), self.sys)
+        with self.assertRaises(ValueError):
+            JointReviewSession(cmd(), o, self.sys)
+
+    # --- v6.1 新規テスト ---
+    def test_timeout_escalation(self):
+        """保留の連鎖（デッドロック）を防ぐタイムアウト・エスカレーション"""
+        # タイムアウトを0時間に設定して、即座にタイムアウト状態を作る
+        s = JointReviewSession(self.res.command, self.res.outcome, self.sys, timeout_hours=0.0)
+        
+        # 何も提出しない（保留状態）のまま時間が経過
+        time.sleep(0.01) # 確実に時間を進める
+        
+        self.assertEqual(s.resolution(), Resolution.ESCALATED)
+
+
+class SystemReviewTests(unittest.TestCase):
+    def test_review_state_machine(self):
+        s = HarmonySystem()
+        s.open_review("r")
+        self.assertEqual(s.review_state("r"), ReviewState.PENDING)
+        s.submit_vote("r", ReviewVote(Signature(*H), True))
+        self.assertEqual(s.review_state("r"), ReviewState.PENDING)
+        self.assertEqual(s.submit_vote("r", ReviewVote(Signature(*A), True)), ReviewState.APPROVED)
+        with self.assertRaises(KeyError):
+            s.review_state("none")
+
+
+class ReviewerTests(unittest.TestCase):
+    def test_fail_closed_on_reviewer_error(self):
+        def boom(c): raise RuntimeError("x")
+        r = review_and_handle(cmd(), [CallableReviewer(*A, boom)])
+        self.assertEqual(r.outcome.status, "pending_review")
+        r2 = review_and_handle(cmd(), [CallableReviewer(*A, boom)], fail_closed=False)
+        self.assertEqual(r2.outcome.status, "allowed")
+
+    def test_async(self):
+        async def run():
+            rv = CallableReviewer(*A, lambda c: Verdict(Stance.CONCUR))
+            return await review_and_handle_async(cmd(), [rv])
+        self.assertEqual(asyncio.run(run()).outcome.status, "allowed")
+
+
+class LedgerTests(unittest.TestCase):
+    def test_roundtrip_keeps_verification(self):
+        sysm = HarmonySystem()
+        ai = CallableReviewer(*A, lambda c: Verdict(Stance.DISSENT, "不明"))
+        res = review_and_handle(cmd("森を破壊する"), [ai], sysm)
+        s = JointReviewSession(res.command, res.outcome, sysm)
+        s.submit(Decision(*H, DecisionKind.APPROVE))
+        s.submit(Decision(*A, DecisionKind.APPROVE))
+        self.assertTrue(s.conclude("対話する", [Signature(*H), Signature(*A)]))
+        p = os.path.join(tempfile.mkdtemp(), "ledger.json")
+        save_ledger(sysm.ledger, p)
+        loaded = load_ledger(p)
+        self.assertTrue(any(r.is_verified for r in loaded.records()))
+
+    def test_bad_format_rejected(self):
+        p = os.path.join(tempfile.mkdtemp(), "bad.json")
+        with open(p, "w") as f:
+            f.write('{"format": 1, "records": []}')
+        with self.assertRaises(ValueError):
+            load_ledger(p)
+
+    # --- v6.1 新規テスト ---
+    def test_ledger_saves_v61_fields(self):
+        """v6.1の新項目（解釈の出所、重み）が台帳に保存・復元されるか"""
+        sysm = HarmonySystem()
+        
+        # 解釈とポジティブ指標を含むセンサー
+        interp = SignalInterpretation("Test-AI", EntityType.AI_NODE, "Test-Algo")
+        sensor = RawSensorStream("s", .1, .1, .1, .1, biodiversity_health=0.9, interpretation=interp)
+        
+        c = cmd(sensor_streams=(sensor,), urgency=UrgencyLevel.CRITICAL)
+        o = handle_resonant_safety_protocol(c, sysm)
+        
+        # 台帳からレコードを取得
+        rec = sysm.ledger.get(o.record_id)
+        
+        # v6.1のフィールドが保存されているか確認
+        self.assertTrue(len(rec.interpretation_sources) > 0)
+        self.assertIn("Test-AI", rec.interpretation_sources[0])
+        
+        p = os.path.join(tempfile.mkdtemp(), "ledger_v61.json")
+        save_ledger(sysm.ledger, p)
+        
+        loaded = load_ledger(p)
+        loaded_rec = loaded.get(o.record_id)
+        
+        self.assertTrue(len(loaded_rec.interpretation_sources) > 0)
+        self.assertIn("Test-AI", loaded_rec.interpretation_sources[0])
+        # デフォルトの重みが保存されているか
+        self.assertEqual(getattr(loaded_rec, "severity_weight", 1.0), 1.0)
+
+
+if __name__ == "__main__":
+    unittest.main()
