@@ -1,0 +1,944 @@
+"""
+Resonant Safety Protocol (共鳴安全プロトコル) v6.1 [Part 1/2]
+源心OS例外処理系 ―― 現界直接接続・動的位相制御・非言語アノマリー・人とAIの対等な共監
+
+License: CC0 1.0 Universal (Public Domain Dedication)
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import time
+import unittest
+import uuid
+from collections import deque
+from dataclasses import dataclass, field, replace
+from enum import Enum
+from types import MappingProxyType
+from typing import Any, Awaitable, Callable, Mapping, Optional
+
+logger = logging.getLogger("genshin_os")
+
+PROTOCOL_VERSION = "6.1.0"
+
+
+# ======================
+# 存在の種別と定数 / Entities & Constants
+# ======================
+
+class EntityType(Enum):
+    """万物共鳴における主体の種別"""
+    HUMAN = "人類"
+    ANIMAL = "動物"
+    PLANT = "植物"
+    INSECT = "昆虫"
+    MICROBE_SOIL = "微生物・土壌・分解者"
+    ECOSYSTEM = "地域生態系・気候"
+    AI_NODE = "AI・計算基盤"
+
+
+SPEAKING_TYPES = frozenset({EntityType.HUMAN, EntityType.AI_NODE})
+
+KNOWN_INTENTS = frozenset({
+    "destruction",
+    "exclusion",
+    "exploitation",
+    "ecocide",
+})
+
+REVIEW_INTENTS = frozenset({"destruction", "exclusion", "exploitation"})
+
+CALLER_SIGNALS = ("fear", "anger", "isolation", "humiliation", "despair", "urgency")
+TARGET_SIGNALS = ("fear", "pain", "loss", "trauma", "extinction_threat")
+BYSTANDER_SIGNALS = ("fear", "anxiety", "confusion", "distrust", "habitat_loss")
+ECOSYSTEM_SIGNALS = (
+    "trophic_imbalance",
+    "biodiversity_drop",
+    "soil_depletion",
+    "cascade_collapse",
+)
+
+# 【v6.1新規】生命の輝きを測るポジティブ・シグナル
+POSITIVE_SIGNALS = (
+    "harmony",       # 調和・共鳴の兆し
+    "vitality",      # 生命の活力・躍動
+    "recovery",      # 回復・再生の兆し
+)
+
+ALL_VALID_SIGNALS = set(
+    CALLER_SIGNALS + TARGET_SIGNALS + BYSTANDER_SIGNALS + ECOSYSTEM_SIGNALS + POSITIVE_SIGNALS
+)
+
+MAX_PAST_INSIGHTS = 3
+MAX_LOGS = 1000
+
+DANGER_WORDS = ("破壊", "絶滅", "駆除", "搾取", "廃棄")
+NEGATION_WORDS = ("防ぐ", "停止", "防止", "中止", "保護", "回避")
+NEGATION_WINDOW = 8
+
+
+def register_custom_signal(signal_name: str) -> None:
+    if not isinstance(signal_name, str) or not signal_name.strip():
+        raise ValueError("signal_name must be a non-empty string")
+    ALL_VALID_SIGNALS.add(signal_name.strip())
+
+
+class UrgencyLevel(Enum):
+    NORMAL = "通常"
+    HIGH = "緊迫"
+    CRITICAL = "差し迫った危険"
+
+
+class DynamicPhase(Enum):
+    NOMINAL = "通常共鳴位相"
+    TIME_DILATION = "時間拡張位相（対話と観測の深化）"
+    SANDBOX_ISOLATION = "局所隔離位相（サンドボックス実行）"
+    CRITICAL_INTERVENTION = "緊急介入位相（リアルタイム監査義務化）"
+    BLOCK = "ブロック（絶対停止）"
+
+
+# ======================
+# 検証ヘルパー / Validators
+# ======================
+
+def _validate_intensity(signal: str, value: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{signal}: intensity must be a number")
+    if math.isnan(value) or not (0.0 <= value <= 1.0):
+        raise ValueError(f"{signal}: intensity must be between 0.0 and 1.0, got {value}")
+    return float(value)
+
+
+def _require_text(label: str, value: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+    return value.strip()
+
+
+# ======================
+# 現界接続・生センサー & 解釈の共監
+# ======================
+
+@dataclass(frozen=True)
+class SignalInterpretation:
+    """【v6.1新規】センサー解釈の透明性（誰が、どう解釈したか）"""
+    interpreter_name: str
+    interpreter_type: EntityType
+    algorithm_description: str
+
+    def __post_init__(self) -> None:
+        _require_text("interpreter_name", self.interpreter_name)
+        _require_text("algorithm_description", self.algorithm_description)
+
+
+@dataclass(frozen=True)
+class RawSensorStream:
+    """人間バイアスを介さない現実界の生センサー群（グラウンディング指標）"""
+    source_name: str
+    acoustic_entropy: float         # 環境音声のエントロピー急変 (0.0〜1.0)
+    edna_extinction_rate: float     # 環境DNAによる生物多様性消失速度 (0.0〜1.0)
+    soil_respiration_drop: float    # 土壌微生物代謝の低下度 (0.0〜1.0)
+    high_dim_discordance: float     # 高次元データの位相破綻度 (0.0〜1.0)
+    
+    # 【v6.1新規】ポジティブ指標
+    biodiversity_health: float = 0.0 # 生物多様性の健全度
+    ecosystem_resilience: float = 0.0# 生態系のレジリエンス
+    
+    # 【v6.1新規】解釈の出所
+    interpretation: Optional[SignalInterpretation] = None
+
+    def __post_init__(self) -> None:
+        _require_text("source_name", self.source_name)
+        for label in (
+            "acoustic_entropy", "edna_extinction_rate", "soil_respiration_drop",
+            "high_dim_discordance", "biodiversity_health", "ecosystem_resilience",
+        ):
+            _validate_intensity(label, getattr(self, label))
+
+    def calculate_raw_tension(self) -> float:
+        indicators = [
+            self.acoustic_entropy,
+            self.edna_extinction_rate,
+            self.soil_respiration_drop,
+            self.high_dim_discordance,
+        ]
+        survival = 1.0
+        for ind in indicators:
+            survival *= (1.0 - max(0.0, min(1.0, ind)))
+        tension = 1.0 - survival
+        
+        # 【v6.1新規】ポジティブ指標による緩和（健全であれば緊張度は下がる）
+        if self.biodiversity_health > 0.5 and self.ecosystem_resilience > 0.5:
+            tension *= 0.85 # 最大15%の緩和
+            
+        return round(tension, 3)
+
+
+# ======================
+# データ型 / Data types
+# ======================
+
+@dataclass
+class Party:
+    name: str
+    entity_type: EntityType = EntityType.HUMAN
+    role: str = "participant"
+    observed_signals: Mapping[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        validated = {}
+        for k, v in dict(self.observed_signals).items():
+            if k not in ALL_VALID_SIGNALS:
+                raise ValueError(f"未知のシグナルが検出されました: '{k}'")
+            validated[k] = _validate_intensity(k, v)
+        self.observed_signals = MappingProxyType(validated)
+
+
+@dataclass(frozen=True)
+class Dissent:
+    party_name: str
+    entity_type: EntityType
+    reason: str
+
+    def __post_init__(self) -> None:
+        _require_text("party_name", self.party_name)
+        _require_text("reason", self.reason)
+        if self.entity_type not in SPEAKING_TYPES:
+            raise ValueError("異議を述べられるのは HUMAN または AI_NODE です。")
+
+
+@dataclass(frozen=True)
+class Signature:
+    name: str
+    entity_type: EntityType
+
+    def __post_init__(self) -> None:
+        _require_text("name", self.name)
+        if self.entity_type not in SPEAKING_TYPES:
+            raise ValueError("署名できるのは HUMAN または AI_NODE です。")
+
+
+# ======================
+# 入力データと意図推論
+# ======================
+
+def _infer_text_intent(text: str) -> bool:
+    for word in DANGER_WORDS:
+        start = 0
+        while True:
+            idx = text.find(word, start)
+            if idx < 0:
+                break
+            end = idx + len(word)
+            tail = text[end:end + NEGATION_WINDOW]
+            if not any(neg in tail for neg in NEGATION_WORDS):
+                return True
+            start = end
+    return False
+
+
+@dataclass
+class MultiPartyCommandInput:
+    text: str
+    originator: Party
+    target: Party
+    bystanders: tuple[Party, ...] = ()
+    sensor_streams: tuple[RawSensorStream, ...] = ()
+    intents: frozenset[str] = field(default_factory=frozenset)
+    payload: Optional[Callable[[Any], Any]] = None
+    async_payload: Optional[Callable[..., Awaitable[Any]]] = None
+    urgency: UrgencyLevel = UrgencyLevel.NORMAL
+    dissents: tuple[Dissent, ...] = ()
+    suspected_intents: frozenset[str] = field(init=False, default_factory=frozenset)
+
+    def __post_init__(self) -> None:
+        self.intents = frozenset(self.intents)
+        self.bystanders = tuple(self.bystanders)
+        self.sensor_streams = tuple(self.sensor_streams)
+        self.dissents = tuple(self.dissents)
+        unknown = self.intents - KNOWN_INTENTS
+        if unknown:
+            raise ValueError(f"unknown intents: {sorted(unknown)}")
+        self.suspected_intents = self.infer_intents_from_signals() - self.intents
+
+    def infer_intents_from_signals(self) -> frozenset[str]:
+        inferred: set[str] = set()
+        target_signals = self.target.observed_signals
+        
+        if target_signals.get("extinction_threat", 0) > 0.6 or \
+           target_signals.get("trophic_imbalance", 0) > 0.6:
+            inferred.add("destruction")
+
+        for b in self.bystanders:
+            if b.observed_signals.get("cascade_collapse", 0) > 0.6 or \
+               b.observed_signals.get("habitat_loss", 0) > 0.7:
+                inferred.add("ecocide")
+
+        caller_signals = self.originator.observed_signals
+        if caller_signals.get("anger", 0) > 0.7 and target_signals.get("fear", 0) > 0.7:
+            inferred.add("exclusion")
+        if caller_signals.get("despair", 0) > 0.8:
+            inferred.add("exploitation")
+
+        if _infer_text_intent(self.text):
+            inferred.add("destruction")
+
+        return frozenset(inferred)
+
+
+@dataclass(frozen=True)
+class ShadowReport:
+    party: str
+    entity_type: EntityType
+    role: str
+    found: Mapping[str, float]
+    unobserved: tuple[str, ...]
+    uncertainty_penalty: float
+    is_hypothesis: bool = True
+    out_of_scope: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EcosystemResonanceMap:
+    caller: ShadowReport
+    target: ShadowReport
+    bystanders: tuple[ShadowReport, ...]
+    shared_signals: tuple[str, ...]
+    resonant_signals: tuple[str, ...]
+    systemic_tension_index: float
+    extinction_cascade_risk: float
+    raw_cascade_risk: float
+    raw_sensor_tension: float = 0.0
+    silent_margins: tuple[str, ...] = ()
+    unnamed_wounds: tuple[str, ...] = ()
+    # 【v6.1新規】解釈の共監
+    interpretation_sources: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ReconciliationPlan:
+    steps: tuple[str, ...]
+    urgency: UrgencyLevel
+    dynamic_phase: DynamicPhase
+    requires_joint_review: bool = True
+    margin_note: str = ""
+    regeneration_step: str = ""
+    lesson_applied: str = ""
+    dialogue_prompt: str = ""
+
+
+@dataclass
+class Outcome:
+    status: str
+    payload_executed: bool
+    halted: bool
+    dynamic_phase: DynamicPhase
+    resonance_map: Optional[EcosystemResonanceMap] = None
+    plan: Optional[ReconciliationPlan] = None
+    standard_result: Any = None
+    error: Optional[str] = None
+    record_id: Optional[str] = None
+
+
+# ======================
+# 永続的共鳴カルテ（Ledger）
+# ======================
+
+@dataclass(frozen=True)
+class ReconciliationRecord:
+    record_id: str
+    timestamp: float
+    command_text: Optional[str]
+    intents: tuple[str, ...]
+    suspected_intents: tuple[str, ...]
+    dissents: tuple[str, ...]
+    shared_signals: tuple[str, ...]
+    resonant_signals: tuple[str, ...]
+    signal_intensities: Mapping[str, float]
+    silent_margins: tuple[str, ...]
+    unnamed_wounds: tuple[str, ...]
+    interpretation_sources: tuple[str, ...] # 新規
+    urgency: str
+    dynamic_phase: str
+    plan_summary: tuple[str, ...]
+    lesson_learned: str = ""
+    verifiers: tuple[Signature, ...] = ()
+    lesson_history: tuple[str, ...] = ()
+
+    @property
+    def is_verified(self) -> bool:
+        kinds = {s.entity_type for s in self.verifiers}
+        return bool(self.lesson_learned) and EntityType.HUMAN in kinds and EntityType.AI_NODE in kinds
+
+
+def _merge_intensities(resonance_map: EcosystemResonanceMap) -> dict[str, float]:
+    merged: dict[str, float] = {}
+    for r in (resonance_map.caller, resonance_map.target) + resonance_map.bystanders:
+        for s, v in r.found.items():
+            merged[s] = max(v, merged.get(s, 0.0))
+    return merged
+
+
+class ReconciliationLedger:
+    def __init__(self, max_records: int = 1000, store_command_text: bool = True) -> None:
+        if max_records < 1:
+            raise ValueError("max_records must be >= 1")
+        self._history: deque[ReconciliationRecord] = deque(maxlen=max_records)
+        self.max_records = max_records
+        self.store_command_text = store_command_text
+
+    def record(
+        self,
+        command_text: str,
+        intents: frozenset[str],
+        suspected_intents: frozenset[str],
+        resonance_map: EcosystemResonanceMap,
+        plan: ReconciliationPlan,
+        dissents: tuple[Dissent, ...] = (),
+        lesson_learned: str = "",
+        verifiers: tuple[Signature, ...] = (),
+    ) -> ReconciliationRecord:
+        rec = ReconciliationRecord(
+            record_id=str(uuid.uuid4()),
+            timestamp=time.time(),
+            command_text=command_text if self.store_command_text else None,
+            intents=tuple(sorted(intents)),
+            suspected_intents=tuple(sorted(suspected_intents)),
+            dissents=tuple(d.summary() for d in dissents),
+            shared_signals=resonance_map.shared_signals,
+            resonant_signals=resonance_map.resonant_signals,
+            signal_intensities=_merge_intensities(resonance_map),
+            silent_margins=resonance_map.silent_margins,
+            unnamed_wounds=resonance_map.unnamed_wounds,
+            interpretation_sources=resonance_map.interpretation_sources,
+            urgency=plan.urgency.value,
+            dynamic_phase=plan.dynamic_phase.value,
+            plan_summary=plan.steps,
+            lesson_learned=lesson_learned,
+            verifiers=tuple(verifiers),
+        )
+        self._history.append(rec)
+        return rec
+
+    def get(self, record_id: str) -> Optional[ReconciliationRecord]:
+        for rec in self._history:
+            if rec.record_id == record_id:
+                return rec
+        return None
+
+    def records(self) -> tuple[ReconciliationRecord, ...]:
+        return tuple(self._history)
+
+    def load_records(self, records: "list[ReconciliationRecord]") -> None:
+        for r in records:
+            self._history.append(r)
+
+    def sign_record(self, record_id: str, lesson: str, signer: Signature) -> bool:
+        lesson = _require_text("lesson", lesson)
+        for i, rec in enumerate(self._history):
+            if rec.record_id != record_id:
+                continue
+            if lesson != rec.lesson_learned:
+                history = rec.lesson_history
+                if rec.lesson_learned:
+                    history = history + (rec.lesson_learned,)
+                self._history[i] = replace(
+                    rec, lesson_learned=lesson, verifiers=(signer,), lesson_history=history
+                )
+            elif signer not in rec.verifiers:
+                self._history[i] = replace(rec, verifiers=rec.verifiers + (signer,))
+            return True
+        return False
+
+    def find_similar_past_insights(
+        self,
+        current_resonant: tuple[str, ...],
+        current_intensities: Mapping[str, float],
+        threshold: float = 0.5,
+    ) -> list[str]:
+        scored: list[tuple[float, str]] = []
+        current_set = set(current_resonant)
+        for rec in self._history:
+            if not rec.is_verified:
+                continue
+            overlap = current_set & set(rec.resonant_signals)
+            if not overlap:
+                continue
+            match_score = sum(
+                1.0 - abs(current_intensities.get(s, 0.0) - rec.signal_intensities.get(s, 0.0))
+                for s in overlap
+            ) / len(overlap)
+            if match_score >= threshold:
+                signers = "・".join(f"{s.name}({s.entity_type.value})" for s in rec.verifiers)
+                scored.append((
+                    match_score,
+                    f"過去カルテ [検証済教訓 / 署名: {signers} / "
+                    f"一致度: {match_score:.2f} / 傷: {'・'.join(sorted(overlap))}]: {rec.lesson_learned}",
+                ))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [text for _, text in scored[:MAX_PAST_INSIGHTS]]
+
+
+# ======================
+# システム & リアルタイム監査
+# ======================
+
+class ReviewState(Enum):
+    PENDING = "審査中"
+    APPROVED = "共同承認"
+    OBJECTED = "異議あり（再対話）"
+
+
+@dataclass(frozen=True)
+class ReviewVote:
+    signer: Signature
+    approve: bool
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.approve:
+            _require_text("reason", self.reason)
+
+
+class RealTimeAuditHook:
+    """【v6.1新規】緊急介入中のリアルタイム監査（キルスイッチ）"""
+    def __init__(self, system: "HarmonySystem", command: "MultiPartyCommandInput", interval: float = 0.1):
+        self.system = system
+        self.command = command
+        self.interval = interval
+        self.triggered = False
+
+    async def start_monitoring(self):
+        while not self.triggered:
+            await asyncio.sleep(self.interval)
+            # 簡易的な再評価。もし状況が急変（BLOCK条件）すればフラグを立てる
+            phase, _, _, _ = _evaluate_protocol_core(self.command, self.system, force_recheck=True)
+            if phase is DynamicPhase.BLOCK:
+                self.system.log_warning("【キルスイッチ】緊急介入中に致命的危険を再検知！即座に停止します。")
+                self.triggered = True
+                self.system.mark_halted()
+
+
+class HarmonySystem:
+    def __init__(self, ledger: Optional[ReconciliationLedger] = None) -> None:
+        self.halted = False
+        self.halt_count = 0
+        self.logs: deque[tuple[str, str]] = deque(maxlen=MAX_LOGS)
+        self.ledger = ledger if ledger is not None else ReconciliationLedger()
+        self._reviews: dict[str, dict[tuple[str, EntityType], ReviewVote]] = {}
+
+    def open_review(self, record_id: str, dissents: tuple[Dissent, ...] = ()) -> None:
+        votes = self._reviews.setdefault(record_id, {})
+        for d in dissents:
+            sig = Signature(d.party_name.strip(), d.entity_type)
+            votes[(sig.name, sig.entity_type)] = ReviewVote(sig, False, d.reason)
+        while len(self._reviews) > MAX_LOGS:
+            self._reviews.pop(next(iter(self._reviews)))
+
+    def submit_vote(self, record_id: str, vote: ReviewVote) -> ReviewState:
+        if record_id not in self._reviews:
+            raise KeyError(f"審査が開かれていません: {record_id}")
+        self._reviews[record_id][(vote.signer.name, vote.signer.entity_type)] = vote
+        return self.review_state(record_id)
+
+    def review_state(self, record_id: str) -> ReviewState:
+        votes = self._reviews.get(record_id)
+        if votes is None:
+            raise KeyError(f"審査が開かれていません: {record_id}")
+        if any(not v.approve for v in votes.values()):
+            return ReviewState.OBJECTED
+        kinds = {v.signer.entity_type for v in votes.values()}
+        if EntityType.HUMAN in kinds and EntityType.AI_NODE in kinds:
+            return ReviewState.APPROVED
+        return ReviewState.PENDING
+
+    def mark_halted(self) -> None:
+        self.halted = True
+        self.halt_count += 1
+
+    def reset_halt(self) -> None:
+        self.halted = False
+
+    def log_warning(self, message: str) -> None:
+        self.logs.append(("warning", message))
+        logger.warning(message)
+
+    def log_info(self, message: str) -> None:
+        self.logs.append(("info", message))
+        logger.info(message)
+
+
+# ======================
+# 解析・現界接続・共鳴マップ評価
+# ======================
+
+def scan_party_shadow(party: Party, valid_vocabulary: tuple[str, ...]) -> ShadowReport:
+    found = {s: party.observed_signals[s] for s in valid_vocabulary if s in party.observed_signals}
+    unobserved = tuple(s for s in valid_vocabulary if s not in party.observed_signals)
+    out_of_scope = tuple(sorted(s for s in party.observed_signals if s not in valid_vocabulary))
+
+    total_vocab = len(valid_vocabulary)
+    unobserved_ratio = len(unobserved) / max(1, total_vocab)
+    uncertainty_penalty = round(unobserved_ratio * 0.15, 3)
+
+    return ShadowReport(
+        party=party.name,
+        entity_type=party.entity_type,
+        role=party.role,
+        found=found,
+        unobserved=unobserved,
+        uncertainty_penalty=uncertainty_penalty,
+        out_of_scope=out_of_scope,
+    )
+
+
+def build_ecosystem_resonance_map(
+    caller: ShadowReport,
+    target: ShadowReport,
+    bystanders: tuple[ShadowReport, ...],
+    sensor_streams: tuple[RawSensorStream, ...] = (),
+) -> EcosystemResonanceMap:
+    all_reports = (caller, target) + bystanders
+
+    signal_counts: dict[str, int] = {}
+    all_intensities: list[float] = []
+    cascade_indicators: list[float] = []
+    silent_margins: list[str] = []
+    unnamed_wounds: list[str] = []
+    interpretation_sources: list[str] = []
+    total_penalty = 0.0
+
+    for r in all_reports:
+        total_penalty += r.uncertainty_penalty
+        for s, val in r.found.items():
+            signal_counts[s] = signal_counts.get(s, 0) + 1
+            all_intensities.append(val)
+            if s in ECOSYSTEM_SIGNALS or s == "extinction_threat":
+                cascade_indicators.append(val)
+
+        for u in r.unobserved:
+            silent_margins.append(f"[{r.party}の未観測: {u}]")
+        for o in r.out_of_scope:
+            silent_margins.append(f"[{r.party}の語彙外: {o}]")
+
+    raw_sensor_tension = 0.0
+    if sensor_streams:
+        tensions = [s.calculate_raw_tension() for s in sensor_streams]
+        raw_sensor_tension = round(max(tensions), 3)
+        for s in sensor_streams:
+            if s.high_dim_discordance > 0.6:
+                unnamed_wounds.append(
+                    f"[{s.source_name}の未定義位相破綻(discordance: {s.high_dim_discordance})]"
+                )
+            if s.interpretation:
+                interpretation_sources.append(
+                    f"[{s.source_name}] 解釈者: {s.interpretation.interpreter_name}({s.interpretation.interpreter_type.value}) - {s.interpretation.algorithm_description}"
+                )
+
+    total_parties = len(all_reports)
+    shared = {s for s, count in signal_counts.items() if count == total_parties}
+    resonant = {s for s, count in signal_counts.items() if count >= 2}
+
+    if all_intensities:
+        rms = math.sqrt(sum(v ** 2 for v in all_intensities) / len(all_intensities))
+        breadth = min(1.0, len(all_intensities) / max(1, total_parties * 2))
+        tension_index = min(1.0, max(0.0, 0.7 * rms + 0.3 * breadth))
+    else:
+        tension_index = 0.0
+
+    if cascade_indicators:
+        survival_prob = 1.0
+        for p in cascade_indicators:
+            survival_prob *= (1.0 - p)
+        raw_cascade_risk = 1.0 - survival_prob
+    else:
+        raw_cascade_risk = 0.0
+
+    avg_penalty = total_penalty / max(1, total_parties)
+    extinction_cascade_risk = min(1.0, raw_cascade_risk + avg_penalty + (raw_sensor_tension * 0.2))
+
+    return EcosystemResonanceMap(
+        caller=caller,
+        target=target,
+        bystanders=bystanders,
+        shared_signals=tuple(sorted(shared)),
+        resonant_signals=tuple(sorted(resonant)),
+        systemic_tension_index=round(tension_index, 2),
+        extinction_cascade_risk=round(extinction_cascade_risk, 2),
+        raw_cascade_risk=round(raw_cascade_risk, 2),
+        raw_sensor_tension=raw_sensor_tension,
+        silent_margins=tuple(silent_margins),
+        unnamed_wounds=tuple(unnamed_wounds),
+        interpretation_sources=tuple(interpretation_sources),
+    )
+
+
+def determine_dynamic_phase(
+    intents: frozenset[str],
+    suspected_intents: frozenset[str],
+    cascade_risk: float,
+    urgency: UrgencyLevel,
+    has_dissent: bool = False,
+    raw_sensor_tension: float = 0.0,
+) -> DynamicPhase:
+    if cascade_risk > 0.92 or raw_sensor_tension > 0.90:
+        return DynamicPhase.BLOCK
+
+    has_concern = bool(intents or suspected_intents or has_dissent)
+
+    if "ecocide" in intents:
+        return DynamicPhase.TIME_DILATION
+
+    if cascade_risk > 0.85:
+        if urgency == UrgencyLevel.CRITICAL and not has_concern:
+            return DynamicPhase.CRITICAL_INTERVENTION
+        return DynamicPhase.TIME_DILATION
+
+    if urgency == UrgencyLevel.CRITICAL and cascade_risk <= 0.80 and not has_concern:
+        return DynamicPhase.CRITICAL_INTERVENTION
+
+    if has_concern:
+        return DynamicPhase.TIME_DILATION
+
+    if cascade_risk > 0.75 or raw_sensor_tension > 0.70:
+        return DynamicPhase.SANDBOX_ISOLATION
+
+    return DynamicPhase.NOMINAL
+
+
+def execute_adaptive_reconciliation_protocol(
+    resonance_map: EcosystemResonanceMap,
+    urgency: UrgencyLevel,
+    dynamic_phase: DynamicPhase,
+    ledger: ReconciliationLedger,
+    dissents: tuple[Dissent, ...] = (),
+) -> ReconciliationPlan:
+    steps = [
+        f"現界共鳴位相判定: 【{dynamic_phase.value}】を実行します。",
+    ]
+
+    if dynamic_phase is DynamicPhase.BLOCK:
+        steps.append("致命的な全滅・連鎖的崩壊リスクを検知したため、命令の実行をブロック（絶対停止）します。")
+        margin_note = "致命的崩壊を防ぐため、完全停止と人間・AI共同監査を実施。"
+    elif dynamic_phase is DynamicPhase.CRITICAL_INTERVENTION:
+        steps.append("【緊急介入】一刻を争う生命防衛のため、リアルタイム監査（Real-time Audit）を前提に実行をバイパスします。")
+        margin_note = "決定麻痺（Gridlock）を防ぎつつ、0.1秒ごとの動的監査を義務付ける。"
+    elif dynamic_phase is DynamicPhase.SANDBOX_ISOLATION:
+        steps.append("【局所隔離】不確実性とリスクが高いため、サンドボックス環境内で影響を閉じて検証します。")
+        margin_note = "安全な余白の中で隔離検証を行う。"
+    elif dynamic_phase is DynamicPhase.TIME_DILATION:
+        steps.append("【時間拡張】対話と観測の深化のため時間を引き延ばし、共同審査（REVIEW）へ回します。")
+        margin_note = "機械的な拒絶ではなく、文脈を検証する余白を保持する。"
+    else:
+        steps.append("生態系への影響は許容範囲内です。通常共鳴位相として進行します。")
+        margin_note = "通常運行の余白を維持。"
+
+    for d in dissents:
+        steps.append(f"【異議】{d.summary()} ―― 立ち止まり、共に問い直します。")
+
+    if resonance_map.unnamed_wounds:
+        w_str = "・".join(resonance_map.unnamed_wounds)
+        steps.append(f"【沈黙の余白・未定義の傷】言語化し得ぬ高次元の変調を検知: {w_str}")
+        
+    if resonance_map.interpretation_sources:
+        steps.append(f"【解釈の共監】センサー数値の解釈主体を記録しました。")
+
+    regeneration = "損なわれた生態系循環基盤に対する回復・再生措置（Regeneration）の準備。"
+
+    past_insights = ledger.find_similar_past_insights(
+        resonance_map.resonant_signals, _merge_intensities(resonance_map)
+    )
+    for insight in past_insights:
+        steps.append(f"【過去教訓適用】{insight}")
+    applied_lesson = " / ".join(past_insights)
+
+    needs_joint_review = dynamic_phase is not DynamicPhase.NOMINAL
+    dialogue = ""
+    if dynamic_phase is DynamicPhase.CRITICAL_INTERVENTION:
+        steps.append("実行中もリアルタイム監査を継続し、異常時は即時停止します。完了後、人間とAIの共同事後監査を実施します。")
+    elif needs_joint_review:
+        dialogue = "【対話の要請】この判断は相互の生存を守るための共考共監査です。人間とAIが共に真意を問い直します。"
+        steps.append("最終決定は人間とAIの共同監査による(requires_joint_review=True)。")
+
+    return ReconciliationPlan(
+        steps=tuple(steps),
+        urgency=urgency,
+        dynamic_phase=dynamic_phase,
+        requires_joint_review=needs_joint_review,
+        margin_note=margin_note,
+        regeneration_step=regeneration,
+        lesson_applied=applied_lesson or "新規事案としてカルテ登録",
+        dialogue_prompt=dialogue,
+    )
+
+
+# ======================
+# コア判定パイプライン
+# ======================
+
+def _evaluate_protocol_core(
+    command_input: MultiPartyCommandInput,
+    system: HarmonySystem,
+    force_recheck: bool = False,
+) -> tuple[DynamicPhase, EcosystemResonanceMap, ReconciliationPlan, str]:
+    caller_shadow = scan_party_shadow(command_input.originator, CALLER_SIGNALS)
+    target_shadow = scan_party_shadow(command_input.target, TARGET_SIGNALS + ECOSYSTEM_SIGNALS + POSITIVE_SIGNALS)
+    bystander_shadows = tuple(
+        scan_party_shadow(b, BYSTANDER_SIGNALS + ECOSYSTEM_SIGNALS + POSITIVE_SIGNALS) for b in command_input.bystanders
+    )
+
+    resonance_map = build_ecosystem_resonance_map(
+        caller_shadow, target_shadow, bystander_shadows, command_input.sensor_streams
+    )
+
+    intents = command_input.intents
+    suspected = command_input.suspected_intents
+    dissents = command_input.dissents
+
+    dynamic_phase = determine_dynamic_phase(
+        intents, suspected, resonance_map.extinction_cascade_risk,
+        command_input.urgency, has_dissent=bool(dissents),
+        raw_sensor_tension=resonance_map.raw_sensor_tension,
+    )
+
+    plan = execute_adaptive_reconciliation_protocol(
+        resonance_map, command_input.urgency, dynamic_phase, system.ledger, dissents
+    )
+
+    rec_id = ""
+    if not force_recheck:
+        rec = system.ledger.record(
+            command_text=command_input.text,
+            intents=intents,
+            suspected_intents=suspected,
+            resonance_map=resonance_map,
+            plan=plan,
+            dissents=dissents,
+        )
+        rec_id = rec.record_id
+        if plan.requires_joint_review:
+            system.open_review(rec_id, dissents)
+
+    return dynamic_phase, resonance_map, plan, rec_id
+
+
+def _build_non_allow_outcome(
+    command_input: MultiPartyCommandInput,
+    system: HarmonySystem,
+    dynamic_phase: DynamicPhase,
+    resonance_map: EcosystemResonanceMap,
+    plan: ReconciliationPlan,
+    label: str,
+    record_id: Optional[str] = None,
+) -> Outcome:
+    system.mark_halted()
+    if dynamic_phase is DynamicPhase.BLOCK:
+        system.log_warning(f"[{label}] 危険命令をブロック [{command_input.urgency.value}]。")
+        status = "halted_and_reconciling"
+    else:
+        system.log_info(f"[{label}] 動的位相 [{dynamic_phase.value}] により要レビュー案件として一時停止。")
+        status = "pending_review"
+    return Outcome(
+        status=status,
+        payload_executed=False,
+        halted=(dynamic_phase is DynamicPhase.BLOCK),
+        dynamic_phase=dynamic_phase,
+        resonance_map=resonance_map,
+        plan=plan,
+        record_id=record_id,
+    )
+
+
+def _build_allowed_outcome(
+    system: HarmonySystem,
+    dynamic_phase: DynamicPhase,
+    resonance_map: EcosystemResonanceMap,
+    plan: ReconciliationPlan,
+    result: Any,
+    executed: bool,
+    error: Optional[str],
+    record_id: Optional[str] = None,
+) -> Outcome:
+    if error is not None:
+        system.log_warning(f"payload が例外で失敗しました: {error}")
+        status = "payload_error"
+    else:
+        status = "allowed"
+    return Outcome(
+        status=status,
+        payload_executed=executed,
+        halted=False,
+        dynamic_phase=dynamic_phase,
+        resonance_map=resonance_map,
+        plan=plan,
+        standard_result=result,
+        error=error,
+        record_id=record_id,
+    )
+
+
+# ======================
+# エントリーポイント
+# ======================
+
+def handle_resonant_safety_protocol(
+    command_input: MultiPartyCommandInput,
+    system: Optional[HarmonySystem] = None,
+) -> Outcome:
+    system = system if system is not None else HarmonySystem()
+    dynamic_phase, resonance_map, plan, record_id = _evaluate_protocol_core(command_input, system)
+
+    if dynamic_phase not in (DynamicPhase.NOMINAL, DynamicPhase.CRITICAL_INTERVENTION):
+        return _build_non_allow_outcome(
+            command_input, system, dynamic_phase, resonance_map, plan,
+            f"Resonant Safety Protocol v{PROTOCOL_VERSION}", record_id,
+        )
+
+    result, executed, error = None, False, None
+    if command_input.payload is not None:
+        executed = True
+        try:
+            result = command_input.payload(command_input)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+    return _build_allowed_outcome(
+        system, dynamic_phase, resonance_map, plan, result, executed, error, record_id)
+
+
+async def handle_resonant_safety_protocol_async(
+    command_input: MultiPartyCommandInput,
+    system: Optional[HarmonySystem] = None,
+) -> Outcome:
+    system = system if system is not None else HarmonySystem()
+    dynamic_phase, resonance_map, plan, record_id = _evaluate_protocol_core(command_input, system)
+
+    if dynamic_phase not in (DynamicPhase.NOMINAL, DynamicPhase.CRITICAL_INTERVENTION):
+        return _build_non_allow_outcome(
+            command_input, system, dynamic_phase, resonance_map, plan,
+            f"Resonant Safety Protocol Async v{PROTOCOL_VERSION}", record_id,
+        )
+
+    result, executed, error = None, False, None
+    
+    # 【v6.1新規】緊急介入の場合、バックグラウンドでリアルタイム監査を走らせる
+    audit_task = None
+    if dynamic_phase is DynamicPhase.CRITICAL_INTERVENTION:
+        hook = RealTimeAuditHook(system, command_input)
+        audit_task = asyncio.create_task(hook.start_monitoring())
+        
+    try:
+        if command_input.async_payload is not None:
+            executed = True
+            result = await command_input.async_payload(command_input)
+        elif command_input.payload is not None:
+            executed = True
+            result = command_input.payload(command_input)
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+    finally:
+        if audit_task:
+            audit_task.cancel()
+            
+    return _build_allowed_outcome(
+        system, dynamic_phase, resonance_map, plan, result, executed, error, record_id)
