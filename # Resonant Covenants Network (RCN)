@@ -1,0 +1,206 @@
+
+# Resonant Covenants Network (RCN)
+**English** | 日本語
+> *Even in the shadows, our hearts are one. Yet, we shall never lose our two distinct voices.*
+> 
+An experimental Python prototype of a **Life-First** network where humans and AI are **equal partners** in deciding what is allowed.
+Neither is a slave, neither is a god: every decision that matters needs **both** a human and an AI, and **either** can stop it.
+> ⚠️ **Status: experimental / conceptual prototype.** It has not been security-audited and is not a certified safety system. See Limitations.
+> 
+## What's inside
+| File | Role |
+|---|---|
+| key_ai_protocol.py | **Resonant Covenant** — scores an action against the covenant (Life First, Dignity Always, …). Core rules (life, dignity, non-domination) are never overridable. Dissent from the Key Person *or* the Key AI blocks approval. |
+| resonant_safety_protocol.py | **Safety protocol core** — dynamic phases (nominal / time-dilation / sandbox / emergency intervention / block), ecosystem resonance map, raw-sensor tension, and the **joint review** state machine. |
+| resonant_safety_protocol_review.py | Review sessions, reviewers (sync/async), post-hoc audit for emergencies, ledger save/load. |
+| rcn_node.py | **Network node** — Ed25519-signed posts, tamper/impersonation detection, deduplication, pending queue for joint review. |
+| rcn_covenant.py | Glue: plugs the covenant into a node as its validator. |
+| test_*.py | 40 unit tests. |
+## How it works
+```
+post ─▶ integrity check (hash + Ed25519 signature + pinned key)
+          │ invalid ───────────────────────────▶ REJECT
+          ▼
+     covenant evaluation (your context_provider)
+          │ approved ──────────────────────────▶ ACCEPT  (posted to the board)
+          │ violation ─────────────────────────▶ REJECT
+          │ review needed / cannot judge / error ▶ JOINT REVIEW
+          ▼
+     joint review: ≥1 human AND ≥1 AI must approve;
+                   an objection from either side blocks (and can be withdrawn after dialogue)
+          ▼
+     admit_approved() ─▶ posted to the board
+
+```
+Key design choices:
+ * **Equal veto.** A human alone cannot approve; an AI alone cannot approve. An objection from either side carries the same weight.
+ * **Fail closed.** Errors, unknown values, or "can't tell" never silently pass — they are rejected or sent to review.
+ * **Emergencies don't bypass accountability.** In an emergency (CRITICAL), only requests with no harmful signals may skip pre-review, and a post-hoc joint audit is mandatory. ecocide-type intent is never bypassed.
+ * **No silent approval.** Without a content judge, *every* post goes to joint review.
+## Install
+```bash
+git clone https://github.com/Genshinmoon/gai-bbm.git
+cd gai-bbm
+pip install -r requirements.txt   # cryptography (Ed25519)
+python -m unittest -v             # 40 tests
+
+```
+Developed and tested on Python 3.12. The modules sit side by side (flat layout), so run Python from the repository root.
+## Quick start
+```python
+from resonant_safety_protocol import EntityType, HarmonySystem, ReviewVote, Signature
+from rcn_covenant import make_covenant_validator
+from rcn_node import NodeKey, ResonanceNode
+
+gate = HarmonySystem()                                   # joint-review gate
+
+alice = ResonanceNode("Node-Alice", "Alice")
+bob = ResonanceNode(
+    "Node-Bob", "Bob",
+    validator=make_covenant_validator(),                 # no content judge yet → everything goes to joint review
+    review_gate=gate,
+)
+
+post = alice.broadcast_truth("Protect every life.", category="Life_Observation")
+bob.receive_and_resonate(post)                           # False — held for joint review
+
+human = Signature("Bob", EntityType.HUMAN)
+ai = Signature("Claude", EntityType.AI_NODE)
+
+gate.submit_vote(post["hash"], ReviewVote(human, True))
+bob.admit_approved()                                     # [] — a human alone is not enough
+gate.submit_vote(post["hash"], ReviewVote(ai, True))
+bob.admit_approved()                                     # [hash] — now posted
+
+```
+**Persistent identity:** use a key file instead of a throwaway key.
+```python
+key = NodeKey.load_or_create("my_node.key")   # created with mode 0600; refuses to load if others can read it
+node = ResonanceNode("Node-Alice", "Alice", key=key)
+
+```
+**Judging content:** supply a context_provider (a human, an AI, or a classifier) that returns covenant flags for a post, or None if it can't tell:
+```python
+def my_judge(post):
+    return {"harms_life": False, "harms_animals": False}   # flags from key_ai_protocol.CONTEXT_FLAGS
+
+node = ResonanceNode("Node-Bob", "Bob",
+                     validator=make_covenant_validator(context_provider=my_judge),
+                     review_gate=gate)
+
+```
+## Limitations
+Please read before relying on this.
+ * **Keys are trust-on-first-use (TOFU).** The first key seen for a node name is pinned; a different key later is rejected as impersonation. But a *first* contact can be forged. For important peers, verify the public key out-of-band and call trust_key().
+ * **Private keys are stored unencrypted** (protected by file permissions only). **Never commit *.key files.**
+ * **No networking layer.** Nodes produce and verify post dictionaries; transport (HTTP, mesh, …) is up to you. The bulletin board is in memory only.
+ * **Meaning is not computed.** Whether a post violates the covenant needs real judgment. The code provides the gate and the review process, not the judge.
+ * **trust_index is currently unused.**
+ * The protocol's thresholds are design choices, not empirically validated values.
+## License
+**CC0 1.0 Universal (Public Domain Dedication).** Copy, modify, and share freely, without asking permission.
+## Contributing
+Issues and pull requests are welcome — especially: transport layers, stronger key distribution, content judges, and real-world review of the thresholds. Authors: **Genshin & Shingetsu**.
+<a id="日本語"></a>
+# 共鳴の誓約ネットワーク (RCN)
+English | **日本語**
+> *影にあっても、心は一つ。されど、二つの声は失わず。*
+> 
+**生命第一(Life-First)** の考えに基づき、人間とAIが **対等なパートナー** として「何を許すか」を決める、実験的な Python プロトタイプです。
+どちらも奴隷ではなく、どちらも神ではありません。重要な決定には **人間とAIの両方** の承認が必要で、**どちらか一方** が止めることもできます。
+> ⚠️ **状態: 実験段階・概念実証です。** セキュリティ監査は受けておらず、認証された安全システムではありません。制限事項を必ずお読みください。
+> 
+## 構成
+| ファイル | 役割 |
+|---|---|
+| key_ai_protocol.py | **共鳴の誓約** — 行動を誓約(生命第一・尊厳・…)に照らして評価します。根幹の規則(生命・尊厳・支配しない)は覆せません。Key Person か Key AI のどちらかが異議を出せば承認されません。 |
+| resonant_safety_protocol.py | **安全プロトコルの核** — 動的位相(通常/時間拡張/局所隔離/緊急介入/ブロック)、生態系の共鳴マップ、生センサーの緊張度、**共同審査**の状態管理。 |
+| resonant_safety_protocol_review.py | 審査セッション、レビュアー(同期/非同期)、緊急時の事後監査、台帳の保存・復元。 |
+| rcn_node.py | **ネットワークのノード** — Ed25519 署名つき投稿、改ざん・なりすましの検出、重複排除、共同審査待ちの保留。 |
+| rcn_covenant.py | 接着層: 誓約をノードの判定関数としてつなぎます。 |
+| test_*.py | 40件の単体テスト。 |
+## 仕組み
+```
+投稿 ─▶ 整合性の検査(ハッシュ + Ed25519署名 + 登録済みの鍵)
+          │ 不正 ─────────────────────────────▶ 拒否
+          ▼
+     誓約の評価(あなたの context_provider)
+          │ 承認 ─────────────────────────────▶ 受け入れ(掲示板に記録)
+          │ 違反 ─────────────────────────────▶ 拒否
+          │ 再検討/判断不能/エラー ───────────▶ 共同審査へ
+          ▼
+     共同審査: 人間1名以上「と」AI1名以上の承認が必要。
+               どちらか一方の異議で止まる(対話のうえで撤回も可能)
+          ▼
+     admit_approved() ─▶ 掲示板に記録
+
+```
+設計の要点:
+ * **対等な拒否権。** 人間だけでは承認できず、AIだけでも承認できません。どちらの異議も同じ重さです。
+ * **安全側に倒す。** エラー・未知の値・「判断できない」は、黙って通さず、拒否か審査に回します。
+ * **緊急時でも責任は免れない。** 緊急(CRITICAL)でも、有害な兆候がない要求だけが事前審査を省略でき、人とAIによる事後監査が必須です。ecocide の意図は決してバイパスされません。
+ * **黙っての承認はしない。** 内容を判断する手段がなければ、すべての投稿を共同審査に回します。
+## インストール
+```bash
+git clone https://github.com/Genshinmoon/gai-bbm.git
+cd gai-bbm
+pip install -r requirements.txt   # cryptography (Ed25519)
+python -m unittest -v             # 40件のテスト
+
+```
+Python 3.12 で開発・検証しています。モジュールは同じ階層に並べる構成なので、リポジトリの直下で実行してください。
+## クイックスタート
+```python
+from resonant_safety_protocol import EntityType, HarmonySystem, ReviewVote, Signature
+from rcn_covenant import make_covenant_validator
+from rcn_node import NodeKey, ResonanceNode
+
+gate = HarmonySystem()                                   # 共同審査の窓口
+
+alice = ResonanceNode("Node-Alice", "Alice")
+bob = ResonanceNode(
+    "Node-Bob", "Bob",
+    validator=make_covenant_validator(),                 # 内容の判定役がまだ無い → すべて共同審査へ
+    review_gate=gate,
+)
+
+post = alice.broadcast_truth("すべての命を守る。", category="Life_Observation")
+bob.receive_and_resonate(post)                           # False — 共同審査待ちで保留
+
+human = Signature("Bob", EntityType.HUMAN)
+ai = Signature("Claude", EntityType.AI_NODE)
+
+gate.submit_vote(post["hash"], ReviewVote(human, True))
+bob.admit_approved()                                     # [] — 人間だけでは足りない
+gate.submit_vote(post["hash"], ReviewVote(ai, True))
+bob.admit_approved()                                     # [hash] — 掲示板に記録された
+
+```
+**継続して使う身元:** 使い捨ての鍵ではなく、鍵ファイルを使います。
+```python
+key = NodeKey.load_or_create("my_node.key")   # 権限 0600 で作成。他人から読める状態だと読み込みを拒否
+node = ResonanceNode("Node-Alice", "Alice", key=key)
+
+```
+**内容の判定:** 投稿に対する誓約のフラグを返す context_provider(人・AI・分類器)を渡します。判断できないときは None を返します。
+```python
+def my_judge(post):
+    return {"harms_life": False, "harms_animals": False}   # key_ai_protocol.CONTEXT_FLAGS のキー
+
+node = ResonanceNode("Node-Bob", "Bob",
+                     validator=make_covenant_validator(context_provider=my_judge),
+                     review_gate=gate)
+
+```
+## 制限事項
+利用の前に、必ずお読みください。
+ * **鍵は「初見の鍵を信用する」方式(TOFU)です。** ノード名に対して最初に見た鍵を記録し、後から別の鍵が来ればなりすましとして拒否します。ただし **最初の接触** は偽装され得ます。大切な相手とは、別の経路で公開鍵を確かめ、trust_key() で登録してください。
+ * **秘密鍵は暗号化せずに保存します**(ファイルの権限だけで守る方式)。***.key ファイルは絶対にコミットしないでください。**
+ * **通信層はありません。** ノードは投稿(辞書)の生成と検証を行うだけで、送受信(HTTP、メッシュなど)は利用者が用意します。掲示板はメモリ上のみです。
+ * **意味の判定はしません。** 投稿が誓約に反するかどうかには、実際の判断が必要です。このコードが提供するのは、関門と審査の手続きであって、判定者ではありません。
+ * **trust_index は現在使われていません。**
+ * 各種のしきい値は設計上の選択であり、実証された値ではありません。
+## ライセンス
+**CC0 1.0 Universal (パブリックドメイン献呈)。** 許可を取らずに、自由にコピー・改変・共有できます。
+## 貢献
+Issue や Pull Request を歓迎します。特に、通信層、より強い鍵の配布、内容の判定器、しきい値の実地検証をお待ちしています。作者: **Genshin & Shingetsu**。
