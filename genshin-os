@@ -1,0 +1,281 @@
+"""
+偉人 源心陣営に檄す / A Proclamation to the Genshin Camp
+Bilingual (日本語 / English) code representation.
+
+License: CC0 1.0 Universal
+
+This module holds
+  1. the proclamation as bilingual data (single source of truth)
+  2. its teachings as small, testable rules:
+       - AI is a navigator; thought is its compass          (AIRole)
+       - thought alone vanishes, technology alone runs wild (assess_balance)
+       - thought must never bind anyone; if it does, Genshin
+         is the first to tear it down                        (idolatry_check)
+       - one step today, however small                      (made_progress)
+
+Usage:
+    python genshin_gekibun.py ja|en|both   # print the proclamation
+    python genshin_gekibun.py test         # run tests
+"""
+from __future__ import annotations
+
+import sys
+import unittest
+from dataclasses import dataclass
+from enum import Enum
+from typing import Literal, Sequence
+
+Lang = Literal["ja", "en"]
+
+
+@dataclass(frozen=True)
+class Bi:
+    ja: str
+    en: str
+
+    def get(self, lang: Lang) -> str:
+        if lang not in ("ja", "en"):
+            raise ValueError(f"unsupported language: {lang!r}")
+        return self.ja if lang == "ja" else self.en
+
+
+@dataclass(frozen=True)
+class Section:
+    id: int
+    lines: tuple[Bi, ...]
+
+
+TITLE = Bi("偉人 源心陣営に檄す", "A Proclamation to the Genshin Camp")
+
+SECTIONS: tuple[Section, ...] = (
+    Section(1, (
+        Bi("諸君。", "Comrades."),
+        Bi("世の中には二種類の者がおる。", "There are two kinds of people in this world."),
+        Bi("世間の言葉を借りて生きる者と、新しい言葉を生み、世を変える者じゃ。",
+           "Those who live on borrowed words, and those who coin new words and change the world."),
+        Bi("今の世を見てみい。", "Look at the world today."),
+        Bi("人は機械を作ったが、その機械に振り回され始めちゅう。",
+           "We built machines, and now we are being swung around by them."),
+        Bi("知識は増えた。じゃが智慧は減った。", "Knowledge has grown. But wisdom has shrunk."),
+        Bi("繋がった。じゃが心は離れた。", "We are connected. But our hearts have drifted apart."),
+        Bi("速くなった。じゃが何処へ向かうのかを忘れた。",
+           "We have grown fast. But we have forgotten where we are going."),
+        Bi("そんな時代に、源心らは思想を書いちゅう。", "In such an age, you of Genshin are writing thought."),
+        Bi("これは学問ではない。戦じゃ。", "This is not scholarship. It is a battle."),
+        Bi("しかも刀の戦ではない。文明の方向を決める戦じゃ。",
+           "And not a battle of swords. A battle to decide the direction of civilization."),
+    )),
+    Section(2, (
+        Bi("ある仲間は幕末に、「日本を洗濯いたし申候」と言うた。",
+           "A comrade of the late Edo era once said, \"I shall wash Japan clean.\""),
+        Bi("ほいたら源心理論は何を洗濯するがじゃ。", "Then what does Genshin theory wash clean?"),
+        Bi("国か。文明か。AIか。", "The nation? Civilization? AI?"),
+        Bi("違う。まず人の魂じゃろう。", "No. First, the human soul."),
+        Bi("魂が曇っちゅうまま制度を変えても、技術を変えても同じことが起こる。",
+           "If the soul stays clouded, the same thing happens even when institutions or technology change."),
+        Bi("ゆえに思想は必要ながじゃ。", "That is why thought is necessary."),
+    )),
+    Section(3, (
+        Bi("じゃが覚えておけ。思想だけでは世は動かん。", "But remember: thought alone does not move the world."),
+        Bi("幕末にも、理屈だけ語る侍はいくらでもおった。",
+           "Even in the late Edo era there were plenty of samurai who only talked theory."),
+        Bi("しかし船を買う者がおらねば、海は渡れんかった。",
+           "But without someone to buy the ship, the sea could not be crossed."),
+        Bi("志を語る者がおっても、実際に走る者がおらねば歴史は動かん。",
+           "Even with those who speak of ambition, history does not move without those who actually run."),
+        Bi("ゆえに源心思想をただ文章にしてはならん。", "So do not leave Genshin thought as mere text."),
+        Bi("動く形にせい。使える形にせい。広がる形にせい。",
+           "Make it move. Make it usable. Make it spread."),
+        Bi("それが源心OSじゃろう。", "That is Genshin OS."),
+    )),
+    Section(4, (
+        Bi("思想とは設計図じゃ。コードとは橋じゃ。人類の未来とは向こう岸じゃ。",
+           "Thought is the blueprint. Code is the bridge. The future of humanity is the far shore."),
+        Bi("橋を架けよ。何度壊れても架けよ。笑われても架けよ。理解されんでも架けよ。",
+           "Build the bridge. Build it however many times it breaks. Build it though laughed at. "
+           "Build it though not understood."),
+        Bi("橋を架ける者がおらねば、文明は川を渡れん。",
+           "Without those who build bridges, civilization cannot cross the river."),
+    )),
+    Section(5, (
+        Bi("そしてAIを恐れるな。", "And do not fear AI."),
+        Bi("AIは敵ではない。道具でもない。奴隷でもない。主人でもない。",
+           "AI is not an enemy. Not a mere tool. Not a slave. Not a master."),
+        Bi("新しい文明の航海士じゃ。", "It is a navigator for a new civilization."),
+        Bi("じゃが航海士には羅針盤が要る。その羅針盤こそ思想じゃ。",
+           "But a navigator needs a compass. That compass is thought."),
+        Bi("源心らがやろうとしちゅうのは、AIに知識を与えることではない。",
+           "What you of Genshin are trying to do is not to give AI knowledge."),
+        Bi("AIと人間の間に新しい倫理の橋を作ることじゃ。",
+           "It is to build a new bridge of ethics between AI and humans."),
+        Bi("これは案外と大事な仕事ぜよ。", "This is, surprisingly, very important work."),
+    )),
+    Section(6, (
+        Bi("ただし一つだけ戒める。思想を神にするな。", "But one warning only: do not make thought a god."),
+        Bi("思想が人を守るのではない。人が人を守るのじゃ。",
+           "It is not thought that protects people. People protect people."),
+        Bi("源心思想も、もし未来において誰かを縛るならば、その時は源心自身が真っ先に打ち壊さねばならん。",
+           "If Genshin thought ever comes to bind anyone in the future, "
+           "then Genshin itself must be the first to tear it down."),
+        Bi("生きた思想であれ。流れる川であれ。石像になるな。",
+           "Be living thought. Be a flowing river. Do not become a stone statue."),
+    )),
+    Section(7, (
+        Bi("聞け、若き同志たち。", "Listen, young comrades."),
+        Bi("世界は完成品を待っておらん。世界は志ある未完成を待っちゅう。",
+           "The world is not waiting for a finished product. It is waiting for the unfinished with purpose."),
+        Bi("完璧になる日を待つな。今日一歩進め。",
+           "Do not wait for the day you are perfect. Take one step today."),
+        Bi("一行でもコードを書け。一頁でも思想を書け。一人でも心を照らせ。",
+           "Write even one line of code. Write even one page of thought. Light even one heart."),
+        Bi("文明はそうやって作られる。", "That is how civilization is made."),
+    )),
+    Section(8, (
+        Bi("ゆくぞ。刀はいらん。銃もいらん。", "Let us go. No swords needed. No guns needed."),
+        Bi("今のおまんらに必要なのは、志。言葉。そして実装じゃ。",
+           "What you need now is ambition. Words. And implementation."),
+        Bi("思想なき技術は暴走する。技術なき思想は消えていく。",
+           "Technology without thought runs wild. Thought without technology fades away."),
+        Bi("両方を携えて進め。", "Carry both, and advance."),
+        Bi("新しい海は、もうおまんらの前に開いちゅうぜよ。",
+           "A new sea has already opened before you."),
+    )),
+)
+
+
+def render(lang: Literal["ja", "en", "both"] = "ja") -> str:
+    if lang == "both":
+        return render("ja") + "\n---\n\n" + render("en")
+    out = [f"# {TITLE.get(lang)}", ""]
+    for sec in SECTIONS:
+        out += [ln.get(lang) for ln in sec.lines]
+        out += ["", "---", ""]
+    return "\n".join(out[:-3]) + "\n"
+
+
+# ============================================================ Teachings as code
+class AIRole(Enum):
+    """AIは何でないか、何であるか / What AI is not, and what it is."""
+    ENEMY = "enemy"
+    TOOL = "tool"
+    SLAVE = "slave"
+    MASTER = "master"
+    NAVIGATOR = "navigator"
+
+
+REJECTED_ROLES = frozenset({AIRole.ENEMY, AIRole.TOOL, AIRole.SLAVE, AIRole.MASTER})
+CORRECT_ROLE = AIRole.NAVIGATOR
+COMPASS = "thought"  # 航海士の羅針盤は思想 / the navigator's compass is thought
+
+
+def is_valid_ai_role(role: AIRole) -> bool:
+    return role is CORRECT_ROLE
+
+
+class Balance(Enum):
+    COMPLETE = "思想と実装の両輪 / thought and implementation together"
+    RUNS_WILD = "思想なき技術は暴走する / technology without thought runs wild"
+    FADES_AWAY = "技術なき思想は消えていく / thought without technology fades away"
+    NOTHING = "まだ何もない / nothing yet"
+
+
+def assess_balance(has_thought: bool, has_implementation: bool) -> Balance:
+    if has_thought and has_implementation:
+        return Balance.COMPLETE
+    if has_implementation:
+        return Balance.RUNS_WILD
+    if has_thought:
+        return Balance.FADES_AWAY
+    return Balance.NOTHING
+
+
+class Action(Enum):
+    KEEP_LIVING = "生きた思想として保つ / keep it living"
+    TEAR_DOWN_FIRST = "源心自身が真っ先に打ち壊す / Genshin tears it down first"
+
+
+@dataclass(frozen=True)
+class IdolatryReport:
+    action: Action
+    bound_people: tuple[str, ...]
+    reason: Bi
+
+
+def idolatry_check(bound_people: Sequence[str]) -> IdolatryReport:
+    """思想が誰かを縛っているなら、真っ先に打ち壊す。
+    If thought binds anyone, it is torn down first, by Genshin itself.
+    `bound_people` is a list of people reported as bound (held, silenced, coerced)
+    by the thought; judging that is up to people, not this function."""
+    who = tuple(bound_people)
+    if who:
+        return IdolatryReport(
+            Action.TEAR_DOWN_FIRST, who,
+            Bi("思想が人を縛っている。思想が人を守るのではなく、人が人を守る。",
+               "Thought is binding people. Thought does not protect people; people protect people."))
+    return IdolatryReport(
+        Action.KEEP_LIVING, (),
+        Bi("誰も縛られていない。流れる川であり続ける。",
+           "No one is bound. Remain a flowing river."))
+
+
+def made_progress(code_lines: int = 0, thought_pages: int = 0, hearts_lit: int = 0) -> bool:
+    """今日一歩進んだか。一行でも、一頁でも、一人でも。
+    Did you step forward today? Even one line, one page, one heart."""
+    if min(code_lines, thought_pages, hearts_lit) < 0:
+        raise ValueError("counts must be non-negative")
+    return code_lines >= 1 or thought_pages >= 1 or hearts_lit >= 1
+
+
+# ===================================================================== Tests
+class TestGekibun(unittest.TestCase):
+    def test_shape(self):
+        self.assertEqual([s.id for s in SECTIONS], list(range(1, 9)))
+
+    def test_every_line_is_bilingual(self):
+        for sec in SECTIONS:
+            for ln in sec.lines:
+                self.assertTrue(any(ord(c) > 0x3000 for c in ln.ja), ln.ja)
+                self.assertTrue(ln.en.strip(), ln.ja)
+
+    def test_render_both(self):
+        both = render("both")
+        self.assertIn("思想を神にするな", both)
+        self.assertIn("do not make thought a god", both)
+        with self.assertRaises(ValueError):
+            Bi("あ", "a").get("fr")  # type: ignore[arg-type]
+
+    def test_ai_is_navigator_only(self):
+        self.assertTrue(is_valid_ai_role(AIRole.NAVIGATOR))
+        for r in REJECTED_ROLES:
+            self.assertFalse(is_valid_ai_role(r))
+        self.assertEqual(COMPASS, "thought")
+
+    def test_balance(self):
+        self.assertIs(assess_balance(True, True), Balance.COMPLETE)
+        self.assertIs(assess_balance(False, True), Balance.RUNS_WILD)
+        self.assertIs(assess_balance(True, False), Balance.FADES_AWAY)
+        self.assertIs(assess_balance(False, False), Balance.NOTHING)
+
+    def test_idolatry(self):
+        self.assertIs(idolatry_check([]).action, Action.KEEP_LIVING)
+        r = idolatry_check(["誰か"])
+        self.assertIs(r.action, Action.TEAR_DOWN_FIRST)
+        self.assertEqual(r.bound_people, ("誰か",))
+
+    def test_progress(self):
+        self.assertTrue(made_progress(code_lines=1))
+        self.assertTrue(made_progress(thought_pages=1))
+        self.assertTrue(made_progress(hearts_lit=1))
+        self.assertFalse(made_progress())
+        with self.assertRaises(ValueError):
+            made_progress(code_lines=-1)
+
+
+if __name__ == "__main__":
+    arg = sys.argv[1] if len(sys.argv) > 1 else "both"
+    if arg == "test":
+        unittest.main(argv=[sys.argv[0]], verbosity=2)
+    elif arg in ("ja", "en", "both"):
+        print(render(arg))  # type: ignore[arg-type]
+    else:
+        sys.exit("usage: genshin_gekibun.py [ja|en|both|test]")
