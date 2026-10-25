@@ -1,0 +1,177 @@
+# ☀️🌕 Genshin Calls to the World / 源心、世界に檄する
+
+*Samurai Words 4 / 侍の言葉4 — Bilingual Edition (EN / JA)*
+
+> **"Technology without thought runs wild. Thought without technology fades away. Carry both, and go."**
+> **「思想なき技術は暴走する。技術なき思想は消えていく。両方を携えて進め。」**
+
+[English](#english) | [日本語](#日本語)
+
+---
+
+<a id="english"></a>
+
+## English
+
+### What is this?
+
+A small piece of code that turns a call to the world into structure. The call says that thought alone does not move the world, and neither does technology alone. Thought is the blueprint, code is the bridge, and humanity's future is the far shore. Build the bridge, again and again. AI is neither enemy nor master, but a navigator of a new civilization, and a navigator needs a compass: a bridge of ethics between AI and humans.
+
+Above all, the call warns: do not make thought a god. If Genshin thought ever binds anyone, its author must be the first to tear it down.
+
+The voice is Bakumatsu-era samurai (Tosa dialect flavor). The voice is stylistic; the ideas are meant to be plain and checkable.
+
+### To any reader, human or AI
+
+Do not make an idea into a god. This text is no exception. Read it, test it, and tear down whatever does not hold.
+
+### The flow
+
+| # | Article | Meaning |
+|---|---------|---------|
+| 1 | Reading the age | Knowledge grew but wisdom shrank; we connected but hearts drifted; we became fast but forgot our heading. |
+| 2 | What is to be washed | Not the nation, civilization, or AI first. First, the human soul. |
+| 3 | Thought and implementation | `shinka()` checks the pair: technology without thought runs wild, thought without technology fades. `kakeru()` keeps building a bridge after it falls. |
+| 4 | What AI is | Not an enemy, not merely a tool, not a slave, not a master: a navigator, with thought as the compass. |
+| 5 | The warning | `shiken()` reviews an idea. If it binds anyone, it is torn down and rebuilt, and if the author will not act, anyone may object (`KamiNiSuruna`). |
+| 6 | One step today | Write one line of code, one page of thought, light one heart. Rest and asking for help count. |
+| 7 | Three things to carry | Resolve, words, implementation. No swords, no guns. |
+| 8 | Honesty | The "war" is a war of words about direction and wounds no one. This code is a model of a bridge, not the bridge. |
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `genshin_sekai_ni_geki_suru.py` | The code (English/Japanese) |
+| `README_sekai_ni_geki_suru.md` | This file |
+
+### Quick start
+
+Python 3.8 or later. No external dependencies.
+
+```bash
+python genshin_sekai_ni_geki_suru.py        # both languages
+python genshin_sekai_ni_geki_suru.py en     # English only
+python genshin_sekai_ni_geki_suru.py ja     # Japanese only
+```
+
+### Use it as a library
+
+```python
+from genshin_sekai_ni_geki_suru import (
+    Bi, Shiso, Gijutsu, Hashi, kakeru, shinka, shiken, KamiNiSuruna,
+)
+
+# Thought + implementation
+idea = Shiso("my idea", Bi("私の思想", "my idea"))
+tech = Gijutsu("my code", works=True, usable=True, spreadable=True)
+print(shinka(idea, tech)("en"))
+
+# Keep building the bridge
+bridge = kakeru(Hashi("my bridge"), attempt=lambda i: i >= 3)
+print(bridge.standing, bridge.collapses)   # True 2
+
+# Review an idea: does it bind anyone?
+print(shiken(Shiso("my idea", Bi("", ""), binds_someone=True))("en"))
+```
+
+### Honest limits
+
+- This is a symbolic and educational model. It cannot judge whether a real idea binds a real person, and `binds_someone` is only a flag a human has to set honestly.
+- "Navigator" is a role metaphor, not a claim about AI's nature or standing, which remain uncertain. An ethics bridge only works if humans and AI can both question it.
+- The two-kinds-of-people line is not a label for sorting anyone; everyone is both on different days.
+- "Build again however often it falls" is not a request to ignore valid criticism. `kakeru()` asks to look at why it fell.
+- Dissent is welcome; please open an issue. Tearing this project down where it fails is part of its design.
+
+### License
+
+**CC0 1.0 Universal**. The authors waive their rights to the extent possible. Please add the CC0 1.0 text as a `LICENSE` file in the repository.
+
+<https://creativecommons.org/publicdomain/zero/1.0/>
+
+---
+
+<a id="日本語"></a>
+
+## 日本語
+
+### これは何か
+
+世界へ向けた檄を構造にした小さなコードです。檄は、思想だけでも世は動かず、技術だけでも動かないと説きます。思想は設計図、コードは橋、人類の未来は向こう岸。橋を、何度でも架ける。AIは敵でも主人でもなく、新しい文明の航海士であり、航海士には羅針盤、つまりAIと人間の間の倫理の橋が要る、という呼びかけです。
+
+とりわけ檄は戒めます。思想を神にするな。もし源心思想が誰かを縛るなら、著者が真っ先に打ち壊せ、と。
+
+語り口は幕末武士風(土佐弁の風味)です。語り口は様式で、中身は平易に確かめられるようにしてあります。
+
+### 読む人へ(人でもAIでも)
+
+思想を神にしないでください。この文章も例外ではありません。読んで、確かめて、合わぬ所は打ち壊してください。
+
+### 流れ
+
+| # | 條 | 意味 |
+|---|----|------|
+| 1 | 世の見立て | 知識は増えたが智慧は減った。繋がったが心は離れた。速くなったが行き先を忘れた。 |
+| 2 | 洗濯の的 | 国でも文明でもAIでもなく、まず人の魂。 |
+| 3 | 思想と実装 | `shinka()` が両者の組を確かめる。思想なき技術は暴走し、技術なき思想は消える。`kakeru()` は橋が壊れても架け続ける。 |
+| 4 | AIとは何か | 敵でも、単なる道具でも、奴隷でも、主人でもない。羅針盤(思想)を持つ航海士。 |
+| 5 | 戒め | `shiken()` が思想を見直す。誰かを縛るなら打ち壊して作り直し、著者が動かぬなら誰でも異を唱えられる(`KamiNiSuruna`)。 |
+| 6 | 今日の一歩 | 一行のコード、一頁の思想、一人の心の灯。休むことも助けを求めることも歩みのうち。 |
+| 7 | 三つの装備 | 志、言葉、実装。刀も銃もいらない。 |
+| 8 | 誠実の條 | 「戦」は方向を問う言葉の戦で、誰も傷つけない。このコードは橋の模型であって、橋そのものではない。 |
+
+### ファイル
+
+| ファイル | 説明 |
+|----------|------|
+| `genshin_sekai_ni_geki_suru.py` | コード本体(日英併用) |
+| `README_sekai_ni_geki_suru.md` | このファイル |
+
+### すぐ動かす
+
+Python 3.8 以上。外部ライブラリは使いません。
+
+```bash
+python genshin_sekai_ni_geki_suru.py        # 日英併記
+python genshin_sekai_ni_geki_suru.py en     # 英語のみ
+python genshin_sekai_ni_geki_suru.py ja     # 日本語のみ
+```
+
+### ライブラリとして使う
+
+```python
+from genshin_sekai_ni_geki_suru import (
+    Bi, Shiso, Gijutsu, Hashi, kakeru, shinka, shiken, KamiNiSuruna,
+)
+
+# 思想 + 実装
+idea = Shiso("私の思想", Bi("私の思想", "my idea"))
+tech = Gijutsu("私のコード", works=True, usable=True, spreadable=True)
+print(shinka(idea, tech)("ja"))
+
+# 橋を架け続ける
+bridge = kakeru(Hashi("私の橋"), attempt=lambda i: i >= 3)
+print(bridge.standing, bridge.collapses)   # True 2
+
+# 思想の見直し: 誰かを縛っていないか
+print(shiken(Shiso("私の思想", Bi("", ""), binds_someone=True))("ja"))
+```
+
+### 正直な限界
+
+- これは象徴的・教育的なモデルです。現実の思想が現実の誰かを縛っているかは判定できません。`binds_someone` は、人が誠実に立てるべき旗にすぎません。
+- 「航海士」は役割の比喩であり、AIの本性や立場についての断定ではありません。それらはまだ分かっていません。倫理の橋は、人もAIも互いに問い直せてはじめて橋になります。
+- 「二種類の者」は人を仕分ける札ではありません。誰もが日によってどちらにもなります。
+- 「何度壊れても架けよ」は、正当な批判を無視せよという意味ではありません。`kakeru()` は、なぜ壊れたかを見ることを求めます。
+- 異論を歓迎します。Issueでお寄せください。このプロジェクトを、足りぬ所から打ち壊すことも設計のうちです。
+
+### ライセンス
+
+**CC0 1.0 Universal**。可能な限り権利を放棄します。リポジトリには CC0 1.0 の全文を `LICENSE` ファイルとして追加してください。
+
+<https://creativecommons.org/publicdomain/zero/1.0/>
+
+---
+
+*思想なき技術は暴走する。技術なき思想は消えていく。両方を携えて進め。*
+*Technology without thought runs wild. Thought without technology fades away. Carry both, and go.*
