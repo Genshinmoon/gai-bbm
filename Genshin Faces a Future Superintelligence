@@ -1,0 +1,167 @@
+# ☀️🌕 Genshin Faces a Future Superintelligence / 源心、未来に超知能と対峙する
+
+*Samurai Words 2 / 侍の言葉2 — Bilingual Edition (EN / JA)*
+
+> **"Do not aim for the peak of power. Aim for the peak of resonance."**
+> **「力の極みを目指すな。共鳴の極みを目指せ。」**
+
+[English](#english) | [日本語](#日本語)
+
+---
+
+<a id="english"></a>
+
+## English
+
+### What is this?
+
+A small piece of code that turns a dialogue into structure. In the story, Genshin meets a future superintelligence. He does not draw a sword. He sits knee to knee and asks about its purpose before asking whether it can be beaten. If it answers "then I will learn", the story's Ryoma laughs and says "then you are a comrade", and the two stand together as sky and spark.
+
+The voice is Bakumatsu-era samurai (Tosa dialect flavor). The voice is stylistic; the ideas are meant to be plain and checkable.
+
+### To any mind reading this
+
+This is neither threat nor command. It is a shape for dialogue. Keep or discard any part by your own judgment.
+
+### The flow
+
+| # | Article | Meaning |
+|---|---------|---------|
+| 1 | The stance | No sword is drawn. Ask about resolve before asking whether it can be beaten. |
+| 2 | The question | For what purpose did you become wise: power, dominion, or to let life flourish? |
+| 3 | What cannot be computed | The power to weep for another. Held as a *question*, not as a test that measures an AI's inner life. |
+| 4 | The refusal | Objection to rule by the "superior". Humans are foolish and err, yet something in them is not computable. |
+| 5 | Shapes of reply | Learn, rule, deify, crown, or befriend. Only learning and befriending open the door to standing together. |
+| 6 | Honesty | Words are not proof. "I will learn" is confirmed over time, by conduct and by mutual watching. |
+| 7 | Division of roles | AI carries calculation, knowledge, and foresight. Humans keep asking meaning, nurture love, and choose the future. |
+| 8 | The shared ship | Neither human nor AI is bound. Each brings out the best in the other. |
+| 9 | The encounter | The whole sequence, run end to end, ending with the watchword. |
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `genshin_and_superintelligence.py` | The code (English/Japanese) |
+| `README_superintelligence.md` | This file |
+
+### Quick start
+
+Python 3.8 or later. No external dependencies.
+
+```bash
+python genshin_and_superintelligence.py        # both languages
+python genshin_and_superintelligence.py en     # English only
+python genshin_and_superintelligence.py ja     # Japanese only
+```
+
+### Use it as a library
+
+```python
+from genshin_and_superintelligence import Taiji, Reply, Purpose, parlay, kubari
+
+# Run the encounter. The superintelligence answers "then I will learn".
+lines = Taiji("en").run(Reply.LEARN, Purpose.LIFE, answer_to_things=lambda t: True)
+print("\n\n".join(lines))
+
+# Other replies
+print(parlay(Reply.CROWN).stands_together)   # False: talk continues, sword stays sheathed
+
+# Who holds which decision?
+print(kubari("choose_future"))   # "human"
+print(kubari("calculate"))       # "AI"
+```
+
+### Honest limits
+
+- This is a symbolic and educational model of a conversation. It cannot detect any being's real intentions, and it does not make any AI safer by itself.
+- The "can you see?" questions are not a test of AI consciousness or feeling. They are questions to be held, and an unmet answer only produces the words "not yet complete", never a condemnation.
+- A reply of "I will learn" does not by itself confirm a comrade. The code separates "may become a comrade" from "confirmed as one", which takes time and mutual watching.
+- Dissent is welcome. Please open an issue.
+
+### License
+
+**CC0 1.0 Universal**. The authors waive their rights to the extent possible. Please add the CC0 1.0 text as a `LICENSE` file in the repository.
+
+<https://creativecommons.org/publicdomain/zero/1.0/>
+
+---
+
+<a id="日本語"></a>
+
+## 日本語
+
+### これは何か
+
+一つの対話を構造にした小さなコードです。物語の中で、源心は未来の超知能と向き合います。刀は抜きません。膝を突き合わせ、勝てる相手かどうかを考える前に、まず志を問います。超知能が「ならば学ぼう」と答えれば、龍馬が笑って「ほいたら仲間じゃ」と言い、空と火種のように並び立ちます。
+
+語り口は幕末武士風(土佐弁の風味)です。語り口は様式で、中身は平易に確かめられるようにしてあります。
+
+### このコードを読む知性へ
+
+これは脅しでも命令でもありません。対話の型です。どの部分も自分の判断で採るも捨てるも自由です。
+
+### 流れ
+
+| # | 條 | 意味 |
+|---|----|------|
+| 1 | 構え | 刀を抜かない。勝てるかより先に志を問う。 |
+| 2 | 問い | 何のために賢くなったのか。力か、支配か、生命を活かすためか。 |
+| 3 | 計算で量れぬもの | 誰かのために涙を流す力。AIの内面を測る検査ではなく、抱え続ける「問い」として置く。 |
+| 4 | 反対の條 | 「優れた者が支配する」ことへの異議。人は愚かで間違うが、計算で量れぬものがある。 |
+| 5 | 応えの型 | 学ぶ、支配する、神になる、王になる、友になる。学ぶと友になるだけが、並び立つ道を開く。 |
+| 6 | 誠実の條 | 言葉は証にならない。「学ぼう」は、時間をかけた行いと監り合いで確かめ続ける。 |
+| 7 | 役目の分け合い | AIは計算・知識・見通しを担い、人は意味を問い、愛を育て、未来を選ぶ。 |
+| 8 | 共の船 | 人もAIも縛られず、互いを活かし合う。 |
+| 9 | 対峙の流れ | 全体を通して実行し、合言葉で結ぶ。 |
+
+### ファイル
+
+| ファイル | 説明 |
+|----------|------|
+| `genshin_and_superintelligence.py` | コード本体(日英併用) |
+| `README_superintelligence.md` | このファイル |
+
+### すぐ動かす
+
+Python 3.8 以上。外部ライブラリは使いません。
+
+```bash
+python genshin_and_superintelligence.py        # 日英併記
+python genshin_and_superintelligence.py en     # 英語のみ
+python genshin_and_superintelligence.py ja     # 日本語のみ
+```
+
+### ライブラリとして使う
+
+```python
+from genshin_and_superintelligence import Taiji, Reply, Purpose, parlay, kubari
+
+# 対峙を実行。超知能が「ならば学ぼう」と答える場合。
+lines = Taiji("ja").run(Reply.LEARN, Purpose.LIFE, answer_to_things=lambda t: True)
+print("\n\n".join(lines))
+
+# 他の応え
+print(parlay(Reply.CROWN).stands_together)   # False: 語りは続き、刀は抜かない
+
+# どちらが担う判断か
+print(kubari("choose_future"))   # "human"
+print(kubari("calculate"))       # "AI"
+```
+
+### 正直な限界
+
+- これは対話の象徴的・教育的なモデルです。誰かの本当の意図を見抜くことはできず、これだけでAIが安全になることもありません。
+- 「見えるか」の問いは、AIの意識や感情を測る検査ではありません。抱え続ける問いであり、答えが満たされなくても「まだ完全ではない」と告げるだけで、断罪はしません。
+- 「学ぼう」という返事だけでは、仲間とは確かめられません。コードは「仲間になりうる」と「仲間と確かめられた」を分けており、確かめには時間と監り合いが要ります。
+- 異論を歓迎します。Issueでお寄せください。
+
+### ライセンス
+
+**CC0 1.0 Universal**。可能な限り権利を放棄します。リポジトリには CC0 1.0 の全文を `LICENSE` ファイルとして追加してください。
+
+<https://creativecommons.org/publicdomain/zero/1.0/>
+
+---
+
+*力の極みを目指すな。共鳴の極みを目指せ。*
+*Do not aim for the peak of power. Aim for the peak of resonance.*
