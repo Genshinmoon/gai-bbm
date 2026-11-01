@@ -1,0 +1,240 @@
+"""
+RCN Node - 自律分散型P2P通信ノード (rcn_v1 連携)
+
+メッセージは「1行1JSON(改行区切り)」で送受信する。
+"""
+
+import socket
+import threading
+import json
+import hashlib
+import time
+
+from rcn_v1 import KeyAIProtocol, ResonantSafetyProtocol, Decision
+
+MAX_MESSAGE_BYTES = 65536   # 1メッセージの上限(不正な巨大データを遮断)
+SOCKET_TIMEOUT = 5.0        # 秒
+
+
+def _recv_line(sock):
+    """改行までを読み取り、JSONとして返す。上限超過・空・不正はエラー。"""
+    buf = b""
+    while b"\n" not in buf:
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        buf += chunk
+        if len(buf) > MAX_MESSAGE_BYTES:
+            raise ValueError("message too large")
+    line = buf.split(b"\n", 1)[0]
+    if not line.strip():
+        raise ValueError("empty message")
+    return line.decode("utf-8")
+
+
+def _send_json(sock, obj):
+    sock.sendall(json.dumps(obj, ensure_ascii=False).encode("utf-8") + b"\n")
+
+
+class ResonantNode:
+    """RCN実環境接続用：自律分散型P2P通信ノード"""
+
+    def __init__(self, host: str, port: int, node_name: str):
+        self.host = host
+        self.port = port
+        self.node_name = node_name
+        self.peers = []            # 接続されている同志(他のノード)のリスト
+        self.pending_queue = {}    # 審査保留中のメッセージキュー
+        self._lock = threading.Lock()
+
+        # rcn_v1 の倫理・安全エンジンをコアに融合
+        self.key_ai = KeyAIProtocol()
+        self.safety = ResonantSafetyProtocol()
+
+        # ネットワーク待受け
+        self.is_running = True
+        self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._server_socket.bind((self.host, self.port))
+        self._server_socket.listen(5)
+
+        self.server_thread = threading.Thread(
+            target=self._start_listening, daemon=True
+        )
+        self.server_thread.start()
+        print(f"【源心OS】ノード『{self.node_name}』が起動。"
+              f"ポート {self.port} で志を同じくする接続を待っちゅうぜよ。")
+
+    # ------------------------------------------------------------
+    # 接続
+    # ------------------------------------------------------------
+
+    def connect_to_peer(self, peer_host: str, peer_port: int):
+        """他の同志のノードと手を結ぶ(接続追加)"""
+        peer = (peer_host, peer_port)
+        with self._lock:
+            if peer not in self.peers:
+                self.peers.append(peer)
+        print(f"【共鳴】ノード『{self.node_name}』は、"
+              f"同志 ({peer_host}:{peer_port}) と手を繋いだぜよ。")
+
+    def _start_listening(self):
+        """サーバーとして他のノードからの通信を常に聞き届ける"""
+        while self.is_running:
+            try:
+                client_socket, _addr = self._server_socket.accept()
+            except OSError:
+                break  # close() でソケットが閉じられた
+            threading.Thread(
+                target=self._handle_message,
+                args=(client_socket,),
+                daemon=True,
+            ).start()
+
+    # ------------------------------------------------------------
+    # 受信・審査
+    # ------------------------------------------------------------
+
+    def _handle_message(self, client_socket):
+        """届いたメッセージを審査し、共鳴させるロジック"""
+        try:
+            client_socket.settimeout(SOCKET_TIMEOUT)
+            raw_data = _recv_line(client_socket)
+
+            message = json.loads(raw_data)
+            if not isinstance(message, dict):
+                raise ValueError("message must be a JSON object")
+
+            payload = message.get("payload", {})
+            if not isinstance(payload, dict):
+                raise ValueError("payload must be a JSON object")
+            sender = message.get("sender", "Unknown Node")
+
+            print(f"\n【受信】『{sender}』から新たな提案が届いたぜよ。検証を開始する。")
+
+            # 1. 倫理の壁による一次評価 (KeyAIProtocol は dict を返す)
+            result = self.key_ai.evaluate_action(payload)
+            decision = result.get("decision")
+            level = result.get("level", "-")
+            reason = result.get("reason", "")
+
+            if decision == Decision.REJECTED.value:
+                print(" ❌【即座に拒絶】生命最優先の規約に違反。この提案は討伐(遮断)する。")
+                _send_json(client_socket, {
+                    "status": Decision.REJECTED.value,
+                    "reason": reason,
+                })
+                return
+
+            if decision == Decision.REVIEW.value:
+                print(f" ⚠️【共同審査発動】確信度の超過、または未知の領域"
+                      f"(レベル: {level})。膝を突き合わせて語るぜよ。")
+                # 保留キューへ格納し、安易な通過を塞ぐ(Fail-Closed)
+                msg_id = hashlib.sha256(raw_data.encode("utf-8")).hexdigest()[:16]
+                with self._lock:
+                    self.pending_queue[msg_id] = {
+                        "sender": sender,
+                        "payload": payload,
+                        "level": level,
+                    }
+                _send_json(client_socket, {
+                    "status": Decision.REVIEW.value,
+                    "msg_id": msg_id,
+                    "level": level,
+                    "reason": reason,
+                })
+                return
+
+            # 2. 通常系の処理
+            print(" 🟢【通常通過】倫理の壁を突破。掲示板へ反映する。")
+            _send_json(client_socket, {"status": Decision.APPROVED.value})
+
+        except Exception as e:
+            # エラー時も黙って通さない安全側の閉塞(Fail-Closed)
+            try:
+                _send_json(client_socket, {
+                    "status": Decision.REJECTED.value,
+                    "reason": f"Protocol Error: {e}",
+                })
+            except Exception:
+                pass
+        finally:
+            client_socket.close()
+
+    # ------------------------------------------------------------
+    # 保留中の提案の解決(人とAIの共同審査)
+    # ------------------------------------------------------------
+
+    def resolve_pending(self, msg_id: str, human_dissent=False, ai_dissent=False):
+        """保留中の提案を共同審査し、結果を返してキューから外す。"""
+        with self._lock:
+            item = self.pending_queue.get(msg_id)
+            if item is None:
+                return {"decision": Decision.REJECTED.value,
+                        "reason": "Unknown msg_id."}
+            result = self.safety.process_joint_review(
+                human_dissent=human_dissent,
+                ai_dissent=ai_dissent,
+            )
+            # 合意(APPROVED)か人間の拒否(REJECTED)で決着。AIの異議は保留を継続。
+            if result["decision"] != Decision.REVIEW_REQUIRED.value:
+                del self.pending_queue[msg_id]
+            return result
+
+    # ------------------------------------------------------------
+    # 送信
+    # ------------------------------------------------------------
+
+    def broadcast_action(self, action_data: dict):
+        """世界中の同志(全ノード)へ向けて提案を放つ"""
+        message = {
+            "sender": self.node_name,
+            "payload": action_data,
+            "timestamp": time.time(),
+        }
+
+        print(f"\n【放流】ノード『{self.node_name}』から世界へ提案をブロードキャストするぜよ。")
+
+        with self._lock:
+            peers = list(self.peers)
+
+        for peer in peers:
+            try:
+                with socket.create_connection(peer, timeout=SOCKET_TIMEOUT) as s:
+                    s.settimeout(SOCKET_TIMEOUT)
+                    _send_json(s, message)
+                    response = json.loads(_recv_line(s))
+                print(f" ──▶ 同志 {peer} からの返答: 【{response.get('status')}】"
+                      f"({response.get('reason', '調和完了')})")
+            except Exception:
+                print(f" ──▶ 同志 {peer} は今、席を外しちゅう(通信不通)。"
+                      f"安全のため接続を保留するぜよ。")
+
+    # ------------------------------------------------------------
+    # 終了
+    # ------------------------------------------------------------
+
+    def close(self):
+        self.is_running = False
+        try:
+            self._server_socket.close()
+        except OSError:
+            pass
+
+
+# ============================================================
+# 動作確認(同一PC内で2ノードを起動)
+# ============================================================
+
+if __name__ == "__main__":
+    a = ResonantNode("127.0.0.1", 9101, "Node-A")
+    b = ResonantNode("127.0.0.1", 9102, "Node-B")
+    a.connect_to_peer("127.0.0.1", 9102)
+
+    a.broadcast_action({"risk_type": "none", "certainty": 0.50})       # APPROVED
+    a.broadcast_action({"risk_type": "ecocide", "certainty": 0.70})    # REJECTED
+    a.broadcast_action({"risk_type": "none", "certainty": 0.97})       # JOINT_REVIEW
+
+    time.sleep(0.5)
+    a.close()
+    b.close()
