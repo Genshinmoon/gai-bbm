@@ -1,0 +1,182 @@
+"""
+RCN Covenant - 署名つき誓約メッセージ
+
+- Ed25519 による電子署名(ノードの身元と改ざん検知)
+- covenant_hash(三つの柱のハッシュ)で、同じ誓約を共有するノードだけが共鳴
+- タイムスタンプとnonceで、過去メッセージの再送(リプレイ)を遮断
+
+依存: pip install cryptography
+"""
+
+import hashlib
+import json
+import os
+import secrets
+import threading
+import time
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
+
+MAX_CLOCK_SKEW = 60.0  # 秒。これ以上ずれたメッセージは拒絶
+
+
+class VerificationError(Exception):
+    """署名・誓約・鮮度の検証に失敗した。"""
+
+
+# ------------------------------------------------------------
+# 誓約ハッシュ
+# ------------------------------------------------------------
+
+def covenant_hash(pillars) -> str:
+    """三つの柱から誓約ハッシュを作る。柱が1文字でも違えば別の誓約になる。"""
+    return hashlib.sha256("|".join(pillars).encode("utf-8")).hexdigest()
+
+
+def node_id_from_public_key(public_key_hex: str) -> str:
+    return hashlib.sha256(bytes.fromhex(public_key_hex)).hexdigest()[:16]
+
+
+# ------------------------------------------------------------
+# ノードの身元
+# ------------------------------------------------------------
+
+class NodeIdentity:
+    """ノードの鍵ペア。秘密鍵はノードの外に出さない。"""
+
+    def __init__(self, private_key: Ed25519PrivateKey = None):
+        self._private_key = private_key or Ed25519PrivateKey.generate()
+        raw = self._private_key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        )
+        self.public_key_hex = raw.hex()
+        self.node_id = node_id_from_public_key(self.public_key_hex)
+
+    @classmethod
+    def load_or_create(cls, path: str) -> "NodeIdentity":
+        """鍵ファイルがあれば読み込み、なければ作成して保存する(権限600)。"""
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                key = serialization.load_pem_private_key(f.read(), password=None)
+            return cls(key)
+        identity = cls()
+        pem = identity._private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(pem)
+        return identity
+
+    def sign(self, data: bytes) -> str:
+        return self._private_key.sign(data).hex()
+
+
+# ------------------------------------------------------------
+# リプレイ防止
+# ------------------------------------------------------------
+
+class NonceCache:
+    """見たことのある(node_id, nonce)を一定時間覚えておく。"""
+
+    def __init__(self, ttl: float = MAX_CLOCK_SKEW * 2):
+        self.ttl = ttl
+        self._seen = {}
+        self._lock = threading.Lock()
+
+    def check_and_add(self, key: str, now: float) -> bool:
+        """初めて見たらTrue。再送ならFalse。"""
+        with self._lock:
+            self._seen = {k: t for k, t in self._seen.items() if now - t < self.ttl}
+            if key in self._seen:
+                return False
+            self._seen[key] = now
+            return True
+
+
+# ------------------------------------------------------------
+# 封筒の作成と検証
+# ------------------------------------------------------------
+
+def make_envelope(identity: NodeIdentity, node_name: str,
+                  payload: dict, covenant: str) -> dict:
+    """署名つきの封筒を作る。署名は送信する本文の文字列そのものに対して行う。"""
+    body = json.dumps(
+        {
+            "sender": node_name,
+            "public_key": identity.public_key_hex,
+            "covenant": covenant,
+            "timestamp": time.time(),
+            "nonce": secrets.token_hex(16),
+            "payload": payload,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return {"body": body, "signature": identity.sign(body.encode("utf-8"))}
+
+
+def verify_envelope(envelope, *, expected_covenant: str, trusted,
+                    nonce_cache: NonceCache, now: float = None) -> dict:
+    """
+    封筒を検証し、本文(dict)を返す。失敗したら VerificationError。
+    trusted: 信頼するnode_idの集合。None なら署名が正しければ誰でも受け入れる。
+    """
+    now = time.time() if now is None else now
+
+    if not isinstance(envelope, dict):
+        raise VerificationError("envelope must be a JSON object")
+    body_str = envelope.get("body")
+    signature = envelope.get("signature")
+    if not isinstance(body_str, str) or not isinstance(signature, str):
+        raise VerificationError("unsigned message")
+
+    try:
+        body = json.loads(body_str)
+    except ValueError:
+        raise VerificationError("invalid body")
+    if not isinstance(body, dict):
+        raise VerificationError("body must be a JSON object")
+
+    # 1. 署名
+    try:
+        pub_hex = body["public_key"]
+        public_key = Ed25519PublicKey.from_public_bytes(bytes.fromhex(pub_hex))
+        public_key.verify(bytes.fromhex(signature), body_str.encode("utf-8"))
+    except (KeyError, TypeError, ValueError, InvalidSignature):
+        raise VerificationError("invalid signature")
+
+    node_id = node_id_from_public_key(pub_hex)
+
+    # 2. 信頼
+    if trusted is not None and node_id not in trusted:
+        raise VerificationError("untrusted node")
+
+    # 3. 誓約
+    if body.get("covenant") != expected_covenant:
+        raise VerificationError("covenant mismatch")
+
+    # 4. 鮮度
+    ts = body.get("timestamp")
+    if not isinstance(ts, (int, float)) or abs(now - ts) > MAX_CLOCK_SKEW:
+        raise VerificationError("stale or invalid timestamp")
+
+    # 5. 再送防止(署名が正しいと確認できてから記録する)
+    nonce = body.get("nonce")
+    if not isinstance(nonce, str) or not nonce:
+        raise VerificationError("missing nonce")
+    if not nonce_cache.check_and_add(f"{node_id}:{nonce}", now):
+        raise VerificationError("replayed message")
+
+    if not isinstance(body.get("payload"), dict):
+        raise VerificationError("payload must be a JSON object")
+
+    body["node_id"] = node_id
+    return body
