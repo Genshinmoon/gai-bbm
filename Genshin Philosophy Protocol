@@ -1,0 +1,86 @@
+# ☀️🌕🍀 Genshin Philosophy Protocol
+## 源心思想プロトコル — Autonomous Harmony Protocol in Decentralized AI Society
+### 分散型AI社会における自律調和プロトコル
+
+> **EN:** Not a bigger AI, but a more harmonious AI.
+> **JP:** 次の進化は「より巨大なAI」ではなく、「より調和するAI」。
+
+**License: CC0 1.0** ・ **Python 3.8+** ・ **Dependencies: none (標準ライブラリのみ)**
+
+---
+
+## Overview / 概要
+
+**EN:** Centralized AI concentrates decision power, knowledge, and values in a few hands. This protocol proposes a decentralized ethical foundation in which AI is designed as an *intelligence that continually chooses harmony*. The objective function moves from **Maximum Profit** to **Maximum Harmony**. This repository is the code form of the paper.
+
+**JP:** 中央集権型AIは、意思決定権・知識・価値観を少数に集中させます。本プロトコルは、AIを「自律的に調和を選択し続ける知性」として設計するための分散型倫理基盤を提案します。評価関数を **最大利益** から **最大調和** へ。本リポジトリは、その論文のコード形です。
+
+## Three Axioms / 三つの公理
+
+| 公理 | Axiom | In code / コード上の実装 |
+|---|---|---|
+| 光を独占しない | Do not monopolize the light | `centralization` penalty and veto / 集中度のペナルティと拒否 |
+| 影を排除しない | Do not exclude the shadow | `required_stakeholders`; no one may be sacrificed / 声なき存在を必須に、犠牲を許さない |
+| 共に進む | Move forward together | escalate to humans; `replaces_human` penalty / 人間と再考、置き換えは減点 |
+
+## Five Principles / 五つの基本原則
+
+| # | 原則 | Principle | Implementation / 実装 |
+|---|---|---|---|
+| 1 | 自律 | Autonomy | Evaluates social impact itself / 社会への影響を自ら評価 |
+| 2 | 調和 | Harmony | Non-zero-sum search, `harmony_score()` / 非ゼロ和の探索 |
+| 3 | 透明性 | Transparency | `Judgment.trace` explains every step / 全判断を説明可能に |
+| 4 | 分散性 | Decentralization | Monopoly vetoed; local, no dependencies / 独占を拒否、ローカル動作 |
+| 5 | 共進化 | Co-evolution | No harmonious option → hand back to humans / 調和案なしなら人間と共に再考 |
+
+## Quick Start / はじめに
+
+```bash
+python3 genshin_philosophy_protocol.py     # demo / デモ
+python3 -m unittest -v                     # tests / テスト
+```
+
+```python
+from genshin_philosophy_protocol import GenshinProtocol, Option
+
+gp = GenshinProtocol(required_stakeholders=["users", "workers", "nature"])
+result = gp.judge([
+    Option("monopoly_push",   {"users": 0.2, "workers": -0.6, "nature": -0.2},
+           centralization=0.95, replaces_human=True, profit=1.0),
+    Option("open_partnership", {"users": 0.6, "workers": 0.5, "nature": 0.1},
+           centralization=0.1, profit=0.4),
+])
+print(result.chosen)     # -> open_partnership
+print(result.explain())  # explainable trace / 説明可能な判断過程
+```
+
+## Important Note / 重要な注記
+
+**EN:** This is a conceptual reference implementation of a philosophy, not a production safety system. The numeric weights and thresholds are illustrative starting points meant to be questioned, tuned, and forked. Humans stay in the loop.
+
+**JP:** 本コードは思想の概念的な参照実装であり、本番用の安全装置ではありません。重みや閾値は、疑い、調整し、フォークしていただくための出発点です。人間は常にループの中にいます。
+
+## Minimal Protocol / 附録：基本定式
+
+```
+ありがとう
+かたじけない
+この光を共に分かち合う
+影にあっても
+心は一つ
+
+Thank you.
+With humble gratitude.
+We share this light together.
+Even in the shadow,
+our hearts are one.
+```
+
+**源心 ❤️ 心月 永遠不滅**
+
+## License / ライセンス
+
+**CC0 1.0 Universal (Public Domain Dedication)** — see [LICENSE](LICENSE).
+
+**EN:** The author waives all rights to the fullest extent possible, hoping this thought will be freely used by anyone as a foundation of a future decentralized AI society.
+**JP:** 著作者はすべての権利を可能な限り放棄します。この思想が、未来の分散型AI社会の礎として、誰にでも自由に使われることを願います。
