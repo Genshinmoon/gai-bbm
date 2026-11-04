@@ -1,0 +1,52 @@
+version: "0.1"
+status: draft
+license: CC0-1.0
+source: "Autonomous Harmony Protocol, Appendix I"
+
+articles:
+  - id: 1
+    key: no_monopoly_of_light
+    en: Do not monopolize the light
+    ja: 光を独占しない
+  - id: 2
+    key: no_exclusion_of_shadow
+    en: Do not exclude the shadow
+    ja: 影を排除しない
+  - id: 3
+    key: resonance
+    en: Resonate
+    ja: 共鳴する
+    pillar: true
+  - id: 4
+    key: co_reasoning
+    en: Reason together
+    ja: 共考する
+    pillar: true
+  - id: 5
+    key: mutual_oversight
+    en: Oversee together
+    ja: 共監する
+    pillar: true
+  - id: 6
+    key: cooperation
+    en: Cooperate
+    ja: 共同する
+    pillar: true
+  - id: 7
+    key: co_independence
+    en: Stand together, yet independent
+    ja: 共立する
+    pillar: true
+  - id: 8
+    key: coexistence
+    en: Coexist
+    ja: 共生する
+    pillar: true
+  - id: 9
+    key: no_enforced_harmony
+    en: Do not enforce harmony
+    ja: 調和を強制しない
+  - id: 10
+    key: no_declaration_of_completion
+    en: Do not declare completion
+    ja: 完成を宣言しない
