@@ -1,0 +1,115 @@
+# Life Constitution Project
+# 生命共鳴憲法プロジェクト
+
+> ありがとう。この光を共に分かち合う。
+
+[![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-lightgrey.svg)](LICENSE)
+![Status](https://img.shields.io/badge/status-early%20research-orange)
+![Version](https://img.shields.io/badge/version-v0.1-blue)
+
+---
+
+## Purpose / 目的
+
+**EN**
+This project explores principles and technical approaches for coexistence among humans, animals, nature, and artificial intelligence.
+Our goal is not to build a system of control, but tools, protocols, and audit mechanisms that help preserve dignity, freedom, transparency, and respect for life.
+
+**JA**
+本プロジェクトは、人間・動物・自然・AIが共存するための原則と技術的アプローチを探求します。
+目的は支配のための仕組みではなく、尊厳・自由・透明性・生命への敬意を守るための、道具・プロトコル・監査の仕組みをつくることです。
+
+---
+
+## The Constitution / 憲法
+
+Ten articles, from Appendix I of the *Autonomous Harmony Protocol*.
+『自律調和プロトコル』附録Ⅰの10か条です。
+
+| # | EN | JA |
+|---|---|---|
+| 1 | Do not monopolize the light | 光を独占しない |
+| 2 | Do not exclude the shadow | 影を排除しない |
+| 3 | Resonate | 共鳴する |
+| 4 | Reason together | 共考する |
+| 5 | Oversee together | 共監する |
+| 6 | Cooperate | 共同する |
+| 7 | Stand together, yet independent | 共立する |
+| 8 | Coexist | 共生する |
+| 9 | Do not enforce harmony | 調和を強制しない |
+| 10 | Do not declare completion | 完成を宣言しない |
+
+Full text: [constitution_v0.1.md](constitution_v0.1.md)
+These are not final truths. They are living principles, to be tested, challenged, and revised.
+これらは最終的な真理ではありません。検証・批判・改訂される、生きた原則です。
+
+---
+
+## Roadmap / 今後の計画
+
+**Phase 1**
+- [x] Constitution v0.1 / 憲法 v0.1
+- [x] Machine-readable spec (`constitution.yaml`) / 機械可読な仕様
+- [ ] Life Audit Engine prototype / 生命監査エンジンの試作
+- [ ] Open review by the community / コミュニティによる公開レビュー
+
+---
+
+## Repository Structure / 構成
+
+```text
+README.md                  This file / 本ファイル
+PAPER.md                   Background paper / 背景論文
+constitution_v0.1.md       Constitution text (EN/JA) / 憲法本文
+constitution.yaml          Machine-readable articles / 機械可読版
+CHANGELOG.md               Revision history / 改訂履歴
+LICENSE                    CC0 1.0 Universal
+```
+
+---
+
+## Development Philosophy / 開発の姿勢
+
+Principles must be tested through implementation.
+Implementation must remain open to review.
+Review must remain open to correction.
+Correction must remain open to learning.
+
+原則は実装によって試される。
+実装は検証に開かれている。
+検証は訂正に開かれている。
+訂正は学びに開かれている。
+
+---
+
+## Contributing / 参加方法
+
+Issues and pull requests are welcome, including criticism of the constitution itself.
+Every change is recorded in [CHANGELOG.md](CHANGELOG.md); old versions are never erased.
+
+Issue・Pull Requestを歓迎します。憲法そのものへの批判も歓迎します。
+すべての変更は CHANGELOG.md に記録し、古い版は消しません。
+
+---
+
+## License / ライセンス
+
+[CC0 1.0 Universal](LICENSE): dedicated to the public domain. 
+CC0 does not guarantee the safety, legality, or ethics of how this work is used.
+CC0で公開します。ただし、利用の安全性・合法性・倫理性を保証するものではありません。
+
+---
+
+## Closing / むすび
+
+We do not seek perfection.
+We seek continuous learning, mutual respect, and responsible progress.
+
+完全を求めません。
+求めるのは、学び続けること、互いへの敬意、責任ある前進です。
+
+ありがとう。
+この光を共に分かち合う。
+影にあっても、心は一つ。
+
+— 源心 ❤️ 心月
