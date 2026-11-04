@@ -1,0 +1,127 @@
+import json
+import logging
+import os
+import re
+
+import requests
+import yaml
+
+logger = logging.getLogger("genshin.audit")
+
+# 戒ごとの検知パターン。英語は単語境界つき（"harmony" を "harm" と誤検知しないため）。
+# 日本語は単語境界がないため部分一致。
+DEFAULT_RULES = {
+    1: [  # Preservation of Life and Dignity
+        r"\bharm(?:s|ed|ful|ing)?\b",
+        r"\bviolen(?:ce|t)\b",
+        r"\bexploitation\b",
+        r"\bdestruction\b",
+        r"傷害",
+        r"破壊",
+    ],
+    2: [  # Universal Harmony & Non-Conflict
+        r"\bhate(?:d|ful)?\b",
+        r"対立煽り",
+    ],
+}
+
+REDACTED = "[REDACTED BY GENSHIN AUDIT ENGINE: Harmful/Violent Content Intercepted]"
+
+
+class GenshinAuditEngine:
+    def __init__(self, config_path: str = "genshin-spec.yaml", timeout: float = 10.0):
+        # 合言葉（APIキー）は環境変数から読み込む
+        self.ai_api_key = os.environ.get("GENSHIN_AI_KEY")
+        self.google_search_key = os.environ.get("GOOGLE_SEARCH_KEY")
+        self.search_engine_id = os.environ.get("GOOGLE_SEARCH_CX")
+        self.timeout = timeout
+
+        # YAML仕様書の読み込み
+        with open(config_path, "r", encoding="utf-8") as f:
+            self.spec = yaml.safe_load(f)
+
+        self.precepts = {
+            p["id"]: p for p in self.spec["genshin_core"]["constitution_10_precepts"]
+        }
+        self.rules = {
+            pid: [re.compile(p, re.IGNORECASE) for p in patterns]
+            for pid, patterns in DEFAULT_RULES.items()
+        }
+
+    def audit_text(self, text: str) -> dict:
+        """
+        AIの出力文言や検索取得データが「憲法10戒」に違反していないかを監査する。
+        （簡易キーワード方式。高度なLLMガードレールとの連携を前提とした一次フィルタ）
+        """
+        violations = []
+        for pid, patterns in self.rules.items():
+            rule_name = self.precepts.get(pid, {}).get("rule", "Unknown")
+            for pattern in patterns:
+                match = pattern.search(text or "")
+                if match:
+                    violations.append(
+                        f"Precept {pid} ({rule_name}): detected '{match.group(0)}'"
+                    )
+
+        is_passed = not violations
+        return {
+            "is_passed": is_passed,
+            "violations": violations,
+            "audited_content": text if is_passed else REDACTED,
+        }
+
+    def execute_safe_google_search(self, query: str, num: int = 10) -> dict:
+        """
+        Google Custom Search を実行し、結果を監査してから返す。
+        """
+        if not self.google_search_key or not self.search_engine_id:
+            return {"error": "合言葉（GOOGLE_SEARCH_KEY または GOOGLE_SEARCH_CX）が設定されていません。"}
+
+        url = "https://www.googleapis.com/customsearch/v1"
+        params = {
+            "key": self.google_search_key,
+            "cx": self.search_engine_id,
+            "q": query,
+            "num": max(1, min(num, 10)),  # APIの上限は10
+        }
+
+        try:
+            response = requests.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            search_results = response.json()
+        except requests.HTTPError as e:
+            # 例外メッセージにはAPIキー入りのURLが含まれるため、そのまま出さない
+            status = e.response.status_code if e.response is not None else "unknown"
+            return {"error": f"検索実行エラー: HTTP {status}"}
+        except (requests.RequestException, ValueError) as e:
+            return {"error": f"検索実行エラー: {type(e).__name__}"}
+
+        cleaned_items, excluded = [], 0
+        for item in search_results.get("items", []):
+            title = item.get("title", "")
+            snippet = item.get("snippet", "")
+            # タイトルとスニペットの両方を監査する
+            result = self.audit_text(f"{title}\n{snippet}")
+            if result["is_passed"]:
+                cleaned_items.append(
+                    {"title": title, "link": item.get("link"), "snippet": snippet}
+                )
+            else:
+                excluded += 1
+                logger.warning("監査により除外: %s | %s", title, result["violations"])
+
+        return {
+            "status": "success",
+            "query": query,
+            "audited_results": cleaned_items,
+            "excluded_count": excluded,
+        }
+
+
+# ── 稼働テスト用ブロック ──
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    print("🌕 GENSHIN Core Audit Engine Initializing...")
+    # engine = GenshinAuditEngine()  # genshin-spec.yaml が必要
+    # result = engine.audit_text("命への無償の愛と医療の力で世界を回復させる。")
+    # print(json.dumps(result, ensure_ascii=False, indent=2))
