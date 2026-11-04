@@ -1,0 +1,32 @@
+# Life Resonance Constitution / 生命共鳴憲法
+
+> Version 0.1 (draft) · License: CC0 1.0 Universal
+
+## About / 概要
+
+**EN**
+This repository studies and implements principles of respect for life
+in a future where humans, animals, and AI coexist.
+The constitution is not a finished work. It is designed to be
+continuously verified and revised.
+
+**JA**
+本リポジトリは、人間・動物・AIが共存する未来における
+生命尊重原則の研究・実装を目的とします。
+本憲法は完成形ではなく、継続的な検証と改訂を前提としています。
+
+## Files / 構成
+
+| File | Description |
+|---|---|
+| `constitution_v0.1.md` | Constitution text (EN/JA) / 憲法本文 |
+| `constitution.yaml` | Machine-readable principles / 機械可読な原則定義 |
+| `CHANGELOG.md` | Revision history / 改訂履歴 |
+| `LICENSE` | CC0 1.0 Universal |
+
+## Contributing / 改訂について
+
+Every revision is recorded in `CHANGELOG.md`.
+Old versions are never erased; changes are made as commits.
+すべての改訂は `CHANGELOG.md` に記録します。
+古い版は消さず、変更はコミットとして残します。
