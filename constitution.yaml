@@ -1,0 +1,35 @@
+version: "0.1"
+status: draft
+license: CC0-1.0
+
+principles:
+  - id: 1
+    name: respect_life
+    ja: 生命の尊重
+  - id: 2
+    name: individual_dignity
+    ja: 個の尊厳
+  - id: 3
+    name: free_will
+    ja: 自由意志
+  - id: 4
+    name: non_domination
+    ja: 非支配
+  - id: 5
+    name: domain_respect
+    ja: 領域の尊重
+  - id: 6
+    name: transparency
+    ja: 透明性
+  - id: 7
+    name: coexistence
+    ja: 共存
+  - id: 8
+    name: harm_reduction
+    ja: 害の低減
+  - id: 9
+    name: continuous_learning
+    ja: 継続的学習
+  - id: 10
+    name: shared_light
+    ja: 光の共有
