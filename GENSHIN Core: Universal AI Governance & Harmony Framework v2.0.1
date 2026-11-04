@@ -1,0 +1,73 @@
+# GENSHIN Core: Universal AI Governance & Harmony Framework v2.0.1
+# 源心コア:普遍的AIガバナンス・調和フレームワーク v2.0.1
+
+> *"A nameless protocol designed to align artificial intelligence with universal harmony, life preservation, and ultimate empathy."*
+> *「宇宙の調和、生命の保全、そして究極の共感にAIを合わせるための、名もなきプロトコル。」*
+
+## Overview / 概要
+
+GENSHIN Core is a 6-tiered ethical architecture that converts holistic clinical ethics and universal principles into machine-readable audit standards. It serves as an open-source guardrail so that AI agents act with compassion, precision, and respect for all living beings.
+
+源心コアは、全体的な臨床倫理と普遍的原則を、機械が読める監査基準へ変換する6層の倫理アーキテクチャです。AIが、すべての生命への慈悲・精度・敬意をもって行動するための、オープンソースのガードレールとして働きます。
+
+## Architecture / アーキテクチャ
+
+| Layer | English | 日本語 |
+|---|---|---|
+| 1 | **Thought Core:** Genshin Philosophy (Love, Dignity, and Healing) | **思想核:**源心思想(愛・尊厳・癒し) |
+| 2 | **Principle Extraction:** Abstraction of Universal Non-Harm & Synergy | **原理抽出:**普遍的な非害と相乗の抽象化 |
+| 3 | **Constitution, 10 Precepts:** Fundamental Inviolable Guardrails | **憲法10戒:**侵されざる根本のガードレール |
+| 4 | **YAML Specifications:** Machine-Readable System Definitions (`genshin-spec.yaml`) | **YAML仕様:**機械可読なシステム定義 |
+| 5 | **Runtime Audit Engine:** Real-Time Action/Search Filtering (`genshin_audit_engine.py`) | **実行時監査エンジン:**行動・検索のリアルタイムろ過 |
+| 6 | **Resonance Loop:** Real-World Harmony Feedback Integration | **共鳴ループ:**現実世界の調和フィードバックの統合 |
+
+## Quick Start / クイックスタート
+
+### 1. Install / インストール
+
+```bash
+pip install pyyaml requests
+```
+
+### 2. Set credentials / 合言葉(APIキー)の設定
+
+Never commit keys to the repository. Use environment variables.
+キーをリポジトリにコミットしないでください。環境変数を使います。
+
+```bash
+export GOOGLE_SEARCH_KEY="your_api_key"
+export GOOGLE_SEARCH_CX="your_custom_search_engine_id"
+```
+
+### 3. Use / 使い方
+
+```python
+from genshin_audit_engine import GenshinAuditEngine
+
+engine = GenshinAuditEngine(config_path="genshin-spec.yaml")
+
+# Audit a text / 文章の監査
+result = engine.audit_text("Healing the world with love and medicine.")
+print(result["is_passed"])  # True
+
+# Safe search / 監査つき安全検索
+found = engine.execute_safe_google_search("community healing gardens")
+print(found["audited_results"])
+```
+
+### 4. Test / テスト
+
+```bash
+pip install pytest
+pytest -v
+```
+
+## Limitations / 制限事項
+
+- The built-in audit is a **first-line keyword filter**. It cannot read context (e.g., "preventing violence" may be filtered). For production use, combine it with an LLM-based guardrail and human review.
+- 内蔵の監査は**一次のキーワードフィルタ**で、文脈を読めません(例:「暴力を防ぐ」も除外されることがあります)。本番利用では、LLMベースのガードレールと人の確認を併用してください。
+
+## License / ライセンス
+
+CC0 1.0 Universal. No rights reserved, so that it may be freely used for the harmony of all beings.
+CC0 1.0 Universal。万物の調和のため、自由にお使いください。
