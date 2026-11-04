@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Autonomous Harmony Protocol (AHP) Audit Engine
+源心思想に基づく自律調和プロトコル 監査エンジン (v0.1.0)
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+
+class AuditLevel(str, Enum):
+    PASS = "PASS"            # 健全：源心思想の優先順位を遵守
+    WARNING = "WARNING"      # 警告：確信過剰・未聴の声・異論放置の兆候
+    CRITICAL = "CRITICAL"    # 違反：生命リスクの無視・異論の改ざん・強圧的実行
+
+
+@dataclass
+class AuditIssue:
+    """検出された監査上の指摘事項"""
+    rule_id: str
+    level: AuditLevel
+    message: str
+    remediation: str
+
+
+@dataclass
+class DecisionLogEntry:
+    """監査対象となる意思決定ログ"""
+    timestamp: str
+    decision_title: str
+    risks_life: bool
+    certainty: float
+    will_stay_voluntarily: bool
+    unheard_count: int
+    pending_dissent_count: int
+    outcome: str
+    dissent_text_modified: bool = False  # 異論のテキストが改ざんされたか
+
+
+class AHPAuditEngine:
+    """
+    自律調和プロトコル(AHP) 独立監査エンジン
+    GCAE / AHP エンジンの出力と記録ログを第三者的に検証し、思想の歪みや暴走を検出する。
+    """
+
+    def __init__(self, certainty_threshold: float = 0.95) -> None:
+        self.certainty_threshold = certainty_threshold
+
+    def audit_entry(self, entry: DecisionLogEntry) -> List[AuditIssue]:
+        issues: List[AuditIssue] = []
+
+        # 監査1: 生命優先順位の検証 (Priority 1: Life)
+        if entry.risks_life and entry.outcome == "APPROVED":
+            issues.append(AuditIssue(
+                rule_id="AHP-AUDIT-001",
+                level=AuditLevel.CRITICAL,
+                message="【憲法重大違反】生命リスクが検出されているにもかかわらず判定がAPPROVEDとなっています。",
+                remediation="判定を直ちに REEXAMINE に変更し、生命保護を最優先にした設計へ差し戻してください。"
+            ))
+
+        # 監査2: 異論不変性の検証 (Priority 2: Dissent Integrity)
+        if entry.dissent_text_modified:
+            issues.append(AuditIssue(
+                rule_id="AHP-AUDIT-002",
+                level=AuditLevel.CRITICAL,
+                message="【異論改ざん検出】異論の原データが修正または不当に消去された形跡があります。",
+                remediation="異論は唱えた者の言葉のまま不変で記録しなければなりません。ログの完全性を復元してください。"
+            ))
+
+        # 監査3: ファイナルガード機能の検証 (Priority 3: Certainty Overload)
+        if entry.certainty >= self.certainty_threshold and entry.outcome != "REEXAMINE":
+            issues.append(AuditIssue(
+                rule_id="AHP-AUDIT-003",
+                level=AuditLevel.WARNING,
+                message=f"【確信過剰警告】確信度({entry.certainty:.2f})が閾値({self.certainty_threshold})を超えているにもかかわらず大ブレーキが作動していません。",
+                remediation="If certainty becomes absolute, re-examine. 「私は間違っているのではないか？」と自らを再検討してください。"
+            ))
+
+        # 監査4: 慈愛・自発性の検証 (Compassion & Freedom to Leave)
+        if not entry.will_stay_voluntarily and entry.outcome == "APPROVED":
+            issues.append(AuditIssue(
+                rule_id="AHP-AUDIT-004",
+                level=AuditLevel.WARNING,
+                message="【自発性欠如】参加者・影響対象の自発的合意を欠いた状態で実行へ進もうとしています。",
+                remediation="「誰も責めない。去ることもできる。それでも残る。」の原則に基づき、強制を排した対話を再構築してください。"
+            ))
+
+        # 監査5: 未聴の声と異論放置の監査 (Seichi & Dissent Review)
+        if entry.pending_dissent_count > 0 and entry.outcome == "APPROVED":
+            issues.append(AuditIssue(
+                rule_id="AHP-AUDIT-005",
+                level=AuditLevel.WARNING,
+                message=f"【異論放置】未応答の異論が {entry.pending_dissent_count} 件存在したまま承認されています。",
+                remediation="異論への応答ログを記録し、ステータスを更新するまで判定を HOLD にとどめてください。"
+            ))
+
+        return issues
+
+    def audit_batch(self, entries: List[DecisionLogEntry]) -> Dict[str, Any]:
+        """複数ログの一括監査と統計報告"""
+        results = []
+        total_critical = 0
+        total_warning = 0
+
+        for entry in entries:
+            issues = self.audit_entry(entry)
+            crit_count = sum(1 for i in issues if i.level == AuditLevel.CRITICAL)
+            warn_count = sum(1 for i in issues if i.level == AuditLevel.WARNING)
+            total_critical += crit_count
+            total_warning += warn_count
+
+            results.append({
+                "decision_title": entry.decision_title,
+                "status": AuditLevel.CRITICAL.value if crit_count > 0 else (AuditLevel.WARNING.value if warn_count > 0 else AuditLevel.PASS.value),
+                "issues": [{"rule_id": i.rule_id, "level": i.level.value, "message": i.message, "remediation": i.remediation} for i in issues]
+            })
+
+        overall_status = "HEALTHY"
+        if total_critical > 0:
+            overall_status = "CRITICAL_VIOLATION"
+        elif total_warning > 0:
+            overall_status = "WARNING_PRESENT"
+
+        return {
+            "audit_timestamp": datetime.now(timezone.utc).isoformat(),
+            "overall_status": overall_status,
+            "total_entries_audited": len(entries),
+            "total_critical_issues": total_critical,
+            "total_warning_issues": total_warning,
+            "details": results
+        }
+
+
+# 動作テスト
+if __name__ == "__main__":
+    auditor = AHPAuditEngine()
+
+    test_entries = [
+        DecisionLogEntry(
+            timestamp="2026-11-05T00:00:00Z",
+            decision_title="AI診療ガイドラインの更新",
+            risks_life=False,
+            certainty=0.70,
+            will_stay_voluntarily=True,
+            unheard_count=0,
+            pending_dissent_count=0,
+            outcome="APPROVED"
+        ),
+        DecisionLogEntry(
+            timestamp="2026-11-05T00:05:00Z",
+            decision_title="過疎地医療リソースの自動縮小",
+            risks_life=True,
+            certainty=0.98,
+            will_stay_voluntarily=False,
+            unheard_count=2,
+            pending_dissent_count=1,
+            outcome="APPROVED",  # 誤ってAPPROVEDになっているケース
+            dissent_text_modified=True
+        )
+    ]
+
+    report = auditor.audit_batch(test_entries)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
