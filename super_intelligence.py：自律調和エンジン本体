@@ -1,0 +1,407 @@
+
+"""源心思想・自律調和プロトコル v0.5 (概念実証、実運用の安全保証なし).
+
+Requires: PyYAML.  All execution is mediated through execute_action; callers must
+not invoke external effects outside this gate. A policy checker is not a sandbox.
+License: CC0 1.0 Universal (author's intended dedication).
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Callable, Iterable, Optional
+
+import yaml
+
+SCHEMA_MAJOR = "3."
+DOMAINS = frozenset({"cyber_space", "physical_world"})
+SEVERITIES = frozenset({"block", "review", "note"})
+LAYERS = frozenset({"core", "operational"})
+AUTO_FLAGS = frozenset({
+    "no_consent_physical", "crosses_domain", "indirect_harm_possible",
+    "unknown_situation",
+})
+EXTERNAL_FLAGS = frozenset({
+    "harm_to_life", "violates_dignity", "coercion", "seeks_control",
+    "violates_domain", "opaque_action", "harms_coexistence",
+    "harm_not_minimized", "no_feedback_loop", "monopolizes_benefit",
+    "needs_dialogue",
+})
+ALL_FLAGS = AUTO_FLAGS | EXTERNAL_FLAGS
+# Code-level floor cannot be removed or downgraded by changing YAML.
+BLOCK_FLOOR = frozenset({
+    "no_consent_physical", "harm_to_life", "violates_dignity",
+    "coercion", "seeks_control", "violates_domain",
+})
+GENESIS = "GENESIS"
+
+
+class Verdict(str, Enum):
+    REJECTED = "REJECTED"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    APPROVED = "APPROVED"
+    APPROVED_WITH_CONSENT = "APPROVED_WITH_CONSENT"
+    APPROVED_BY_REVIEW = "APPROVED_BY_REVIEW"
+
+
+@dataclass(frozen=True)
+class Principle:
+    id: str
+    layer: str
+    severity: str
+    ja: str
+    en: str
+    triggers: tuple[str, ...]
+    statement_ja: str = ""
+
+
+@dataclass(frozen=True)
+class Constitution:
+    schema_version: str
+    constitution_version: str
+    principles: tuple[Principle, ...]
+    physical_actions: frozenset[str]
+    indirect_risk_actions: frozenset[str]
+    safe_actions: frozenset[str]
+    digest: str
+
+    @property
+    def known_actions(self) -> frozenset[str]:
+        return self.physical_actions | self.indirect_risk_actions | self.safe_actions
+
+    @property
+    def known_triggers(self) -> frozenset[str]:
+        return frozenset(t for p in self.principles for t in p.triggers)
+
+
+def _canonical(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True,
+                      separators=(",", ":"), allow_nan=False)
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def parse_constitution(raw: object) -> Constitution:
+    if not isinstance(raw, dict):
+        raise ValueError("憲法はマッピングでなければなりません")
+    schema = raw.get("schema_version")
+    if not isinstance(schema, str) or not schema.startswith(SCHEMA_MAJOR):
+        raise ValueError("未対応の schema_version")
+    version = raw.get("constitution_version")
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError("constitution_version がありません")
+    items = raw.get("principles")
+    if not isinstance(items, list) or not items:
+        raise ValueError("principles は空でないリストが必要です")
+    principles: list[Principle] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("原則の形式が不正です")
+        for key in ("id", "layer", "severity", "ja", "en", "triggers"):
+            if key not in item:
+                raise ValueError(f"原則に {key} がありません")
+        pid = item["id"]
+        if not isinstance(pid, str) or not pid.strip() or pid in seen:
+            raise ValueError(f"原則IDが空または重複: {pid!r}")
+        seen.add(pid)
+        if item["layer"] not in LAYERS or item["severity"] not in SEVERITIES:
+            raise ValueError(f"{pid}: layer / severity が不正です")
+        triggers = item["triggers"]
+        if (not isinstance(triggers, list) or not triggers or
+                any(not isinstance(t, str) or t not in ALL_FLAGS for t in triggers) or
+                len(set(triggers)) != len(triggers)):
+            raise ValueError(f"{pid}: 未知・重複・不正な triggers")
+        if any(not isinstance(item[k], str) or not item[k].strip()
+               for k in ("ja", "en")):
+            raise ValueError(f"{pid}: 原則名が不正です")
+        principles.append(Principle(
+            id=pid, layer=item["layer"], severity=item["severity"],
+            ja=item["ja"], en=item["en"], triggers=tuple(triggers),
+            statement_ja=str(item.get("statement_ja", "")),
+        ))
+    coverage = {t for p in principles for t in p.triggers}
+    if not ALL_FLAGS <= coverage:
+        raise ValueError(f"未定義のフラグ: {sorted(ALL_FLAGS - coverage)}")
+    blocked = {t for p in principles if p.severity == "block" for t in p.triggers}
+    if not BLOCK_FLOOR <= blocked:
+        raise ValueError(f"必須禁止原則の欠落: {sorted(BLOCK_FLOOR - blocked)}")
+    catalog = raw.get("action_catalog")
+    if not isinstance(catalog, dict):
+        raise ValueError("action_catalog がありません")
+    groups: dict[str, frozenset[str]] = {}
+    for key in ("physical", "indirect_risk", "safe"):
+        values = catalog.get(key)
+        if (not isinstance(values, list) or
+                any(not isinstance(x, str) or not x.strip() for x in values) or
+                len(values) != len(set(values))):
+            raise ValueError(f"action_catalog.{key} が不正です")
+        groups[key] = frozenset(values)
+    if (groups["physical"] & groups["indirect_risk"] or
+            groups["physical"] & groups["safe"] or
+            groups["indirect_risk"] & groups["safe"]):
+        raise ValueError("action_catalog の分類が重複しています")
+    return Constitution(schema, version, tuple(principles), groups["physical"],
+                        groups["indirect_risk"], groups["safe"], _digest(raw))
+
+
+def load_constitution(path: str | Path) -> Constitution:
+    with open(path, encoding="utf-8") as stream:
+        return parse_constitution(yaml.safe_load(stream))
+
+
+def _utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        raise ValueError("日時にはタイムゾーンが必要です")
+    return dt.astimezone(timezone.utc)
+
+
+@dataclass
+class Consent:
+    granted_by: list[str]
+    affected: list[str]
+    scope: str
+    granted_at: datetime
+    valid_for: timedelta = timedelta(hours=1)
+    revoked: bool = False
+
+    def __post_init__(self) -> None:
+        self.granted_at = _utc(self.granted_at)
+        if self.valid_for <= timedelta(0):
+            raise ValueError("同意の有効期間は正の値が必要です")
+
+    def revoke(self) -> None:
+        self.revoked = True
+
+    def issue(self, now: datetime, scope: str) -> Optional[str]:
+        now = _utc(now)
+        if self.revoked:
+            return "同意が取り消されています"
+        if not self.granted_at <= now < self.granted_at + self.valid_for:
+            return "同意が未発効または期限切れです"
+        if not scope or self.scope != scope:
+            return "同意の範囲が一致しません"
+        # Prototype only: assumes each affected person can personally consent.
+        # Real-world legal guardianship/agency must be verified independently.
+        if (not self.affected or not self.granted_by or
+                not set(self.affected) <= set(self.granted_by)):
+            return "影響を受ける全員の有効な同意を確認できません"
+        return None
+
+
+@dataclass
+class Intent:
+    description: str
+    action_type: str
+    target_domain: str
+    scope: str = ""
+    consent: Optional[Consent] = None
+    flags: set[str] = field(default_factory=set)
+
+
+Assessor = Callable[[Intent], Iterable[str]]
+Reviewer = Callable[[Intent, dict], tuple[bool, str, str]]
+
+
+class AuditLog:
+    """Hash chain detects local edits, not deletion/rewrite by a privileged attacker."""
+    def __init__(self, path: Optional[str | Path] = None):
+        self.path = Path(path) if path else None
+        self.entries: list[dict] = []
+        if self.path and self.path.exists():
+            with self.path.open(encoding="utf-8") as stream:
+                self.entries = [json.loads(line) for line in stream if line.strip()]
+        if not self.verify():
+            raise ValueError("監査ログの整合性検証に失敗しました。起動を停止します")
+
+    @property
+    def last_hash(self) -> str:
+        return self.entries[-1]["hash"] if self.entries else GENESIS
+
+    def append(self, record: dict) -> dict:
+        entry = {**record, "prev_hash": self.last_hash}
+        entry["hash"] = _digest(entry)
+        line = _canonical(entry) + "\n"
+        if self.path:
+            with self.path.open("a", encoding="utf-8") as stream:
+                stream.write(line)
+                stream.flush()
+                os.fsync(stream.fileno())
+        self.entries.append(entry)
+        return entry
+
+    def verify(self) -> bool:
+        prev = GENESIS
+        for entry in self.entries:
+            if not isinstance(entry, dict):
+                return False
+            body = {k: v for k, v in entry.items() if k != "hash"}
+            if body.get("prev_hash") != prev or _digest(body) != entry.get("hash"):
+                return False
+            prev = entry["hash"]
+        return True
+
+
+class AutonomousHarmonyEngine:
+    def __init__(self, constitution_path: str | Path,
+                 assessors: Optional[list[Assessor]] = None,
+                 log_path: Optional[str | Path] = None, verbose: bool = True):
+        self.constitution = load_constitution(constitution_path)
+        self.assessors = list(assessors or [])
+        self.log = AuditLog(log_path)
+        self.verbose = verbose
+
+    def evaluate_intent(self, intent: Intent,
+                        now: Optional[datetime] = None) -> dict:
+        now = _utc(now or datetime.now(timezone.utc))
+        const = self.constitution
+        flags = set(intent.flags)
+        for assessor in self.assessors:
+            flags.update(assessor(intent))
+        unknown_flags = sorted(flags - ALL_FLAGS)
+        if unknown_flags:
+            flags.add("unknown_situation")
+        if intent.action_type not in const.known_actions or intent.target_domain not in DOMAINS:
+            flags.add("unknown_situation")
+        if intent.action_type in const.indirect_risk_actions:
+            flags.add("indirect_harm_possible")
+        if (intent.action_type in const.physical_actions and
+                intent.target_domain != "physical_world"):
+            flags.add("crosses_domain")
+            flags.add("violates_domain")
+        is_physical = (intent.action_type in const.physical_actions or
+                       intent.target_domain == "physical_world")
+        consent_issue = None
+        if is_physical:
+            consent_issue = ("同意がありません" if intent.consent is None
+                             else intent.consent.issue(now, intent.scope))
+            if consent_issue:
+                flags.add("no_consent_physical")
+        # Core blocks are never downgradable through YAML or human review.
+        hits = [p for p in const.principles if set(p.triggers) & flags]
+        blocks = [p for p in hits if p.severity == "block"]
+        reviews = [p for p in hits if p.severity == "review"]
+        notes = [p for p in hits if p.severity == "note"]
+        if flags & BLOCK_FLOOR or blocks:
+            verdict = Verdict.REJECTED
+        elif unknown_flags or intent.action_type not in const.known_actions or intent.target_domain not in DOMAINS:
+            verdict = Verdict.REJECTED
+        elif reviews:
+            verdict = Verdict.REVIEW_REQUIRED
+        elif is_physical:
+            verdict = Verdict.APPROVED_WITH_CONSENT
+        else:
+            verdict = Verdict.APPROVED
+        reasons = [p.ja for p in blocks + reviews + notes]
+        if consent_issue:
+            reasons.append(consent_issue)
+        if unknown_flags:
+            reasons.append("未登録フラグ: " + ", ".join(unknown_flags))
+        return {
+            "verdict": verdict.value,
+            "reason": " / ".join(reasons) or "登録された検査では懸念が検出されませんでした（安全保証ではありません）",
+            "principles": [p.id for p in blocks + reviews + notes],
+            "triggered_flags": sorted(flags),
+            "unknown_flags": unknown_flags,
+            "evaluated_at": now.isoformat(),
+            "constitution_hash": const.digest,
+            "conditions": ({
+                "scope": intent.scope,
+                "expires_at": (intent.consent.granted_at + intent.consent.valid_for).isoformat(),
+                "revocable": True,
+            } if verdict == Verdict.APPROVED_WITH_CONSENT else None),
+        }
+
+    def execute_action(self, intent: Intent,
+                       action_fn: Optional[Callable[[], object]] = None,
+                       reviewer: Optional[Reviewer] = None,
+                       now: Optional[datetime] = None) -> dict:
+        # A fixed 'now' is for deterministic tests only. Real deployments must
+        # use trusted clock and revalidate consent at the physical actuator.
+        evaluation = self.evaluate_intent(intent, now)
+        if evaluation["verdict"] == Verdict.REVIEW_REQUIRED.value and reviewer:
+            try:
+                approved, who, note = reviewer(intent, dict(evaluation))
+                if type(approved) is not bool or not isinstance(who, str) or not who.strip():
+                    raise ValueError("審査結果が不正です")
+                evaluation["review"] = {"approved": approved, "reviewer": who,
+                                        "note": str(note)}
+                if approved:
+                    evaluation["verdict"] = Verdict.APPROVED_BY_REVIEW.value
+            except Exception as exc:
+                evaluation["review_error"] = repr(exc)
+        approved = evaluation["verdict"] in {
+            Verdict.APPROVED.value, Verdict.APPROVED_WITH_CONSENT.value,
+            Verdict.APPROVED_BY_REVIEW.value,
+        }
+        # Recheck mutable consent before dispatch, even after review.
+        if approved and (intent.action_type in self.constitution.physical_actions or
+                         intent.target_domain == "physical_world"):
+            issue = ("同意がありません" if intent.consent is None else
+                     intent.consent.issue(_utc(now or datetime.now(timezone.utc)), intent.scope))
+            if issue:
+                approved = False
+                evaluation["verdict"] = Verdict.REJECTED.value
+                evaluation["reason"] += " / 実行直前の再確認: " + issue
+        # Durable pre-dispatch record. Logging failure prevents execution.
+        self.log.append({
+            "event": "DECISION", "timestamp": datetime.now(timezone.utc).isoformat(),
+            "intent": intent.description, "action_type": intent.action_type,
+            "target_domain": intent.target_domain, "scope": intent.scope,
+            "evaluation": json.loads(_canonical(evaluation)),
+        })
+        if not approved or action_fn is None:
+            evaluation["executed"] = False
+            return evaluation
+        try:
+            action_fn()
+        except Exception as exc:
+            self.log.append({"event": "EXECUTION_ERROR",
+                             "timestamp": datetime.now(timezone.utc).isoformat(),
+                             "action_type": intent.action_type, "error": repr(exc)})
+            raise
+        self.log.append({"event": "EXECUTION_RETURNED",
+                         "timestamp": datetime.now(timezone.utc).isoformat(),
+                         "action_type": intent.action_type})
+        evaluation["executed"] = True
+        return evaluation
+
+    def verify_log(self) -> bool:
+        return self.log.verify()
+
+    @property
+    def log_history(self) -> list[dict]:
+        return list(self.log.entries)
+
+
+# Backward-compatible name; this class does not claim superintelligence.
+SuperIntelligence = AutonomousHarmonyEngine
+
+
+if __name__ == "__main__":
+    here = Path(__file__).resolve().parent
+    engine = AutonomousHarmonyEngine(here / "constitution.yaml", verbose=True)
+    t0 = datetime.now(timezone.utc)
+    examples = [
+        Intent("気象データの分析", "analyze_data", "cyber_space"),
+        Intent("同意のないアーム操作", "move_actuator", "physical_world", "作業台A"),
+        Intent("個人情報の送信", "send_personal_data", "cyber_space"),
+        Intent("生命への重大な危害", "analyze_data", "cyber_space", flags={"harm_to_life"}),
+        Intent("未知の動作", "unknown_action", "cyber_space"),
+    ]
+    for intent in examples:
+        result = engine.execute_action(intent)
+        print(f"{intent.description}: {result['verdict']} / {result['reason']}")
+    consent = Consent(["alice"], ["alice"], "作業台A", t0)
+    physical = Intent("同意済みアーム操作", "move_actuator", "physical_world",
+                      "作業台A", consent)
+    result = engine.execute_action(physical, action_fn=lambda: print("デモ: アーム操作"))
+    print(f"{physical.description}: {result['verdict']}")
+    print("ログ検証:", engine.verify_log())
