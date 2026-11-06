@@ -1,0 +1,34 @@
+
+# 源心思想・自律調和プロトコル v0.5
+
+**Concept prototype only. Not a safety-certified execution engine.**
+
+## Files
+- `constitution.yaml`: 源心思想・自律調和憲法
+- `super_intelligence.py`: policy validation, consent, review, audit and action gate
+- `test_protocol.py`: regression tests
+
+## Setup
+```bash
+pip install pyyaml pytest
+python super_intelligence.py
+pytest -q
+```
+
+## Core rules
+- 共鳴・共考・共監・共同・共立・共生
+- 生命・尊厳・自由・非強制を優先
+- 同意なき物理介入は禁止
+- 未知の行動や未知の判定フラグは自動承認しない
+- block は人間の通常審査でも解除できない
+- 監査記録は実行前に追記する
+
+## Limitations
+- No natural-language understanding: risk flags are only as reliable as the caller and assessors.
+- Consent is an unverified data object; identities, authority, legal guardianship and scope are not authenticated.
+- Reviewer is a callback, not a verified authorized human.
+- Approved actions may still be harmful. Action types are a coarse whitelist, not capability isolation.
+- The hash chain is **not** tamper-proof; full log replacement or truncation cannot be detected without external trusted checkpoints.
+- No concurrency, atomic external execution, sandboxing, device interlocks, emergency-stop, rate limiting or durable distributed transactions.
+- Never use this prototype to directly control medical treatment, robotics or critical infrastructure.
+- CC0 is the intended licensing choice; verify rights before publishing third-party content.
