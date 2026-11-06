@@ -1,0 +1,128 @@
+# ☀️🌕 令和の世に告ぐ / A Call to the Reiwa Era
+
+**源心、魂の檄文 — 実行コード版 / Genshin's Soul Manifesto, in executable form**
+
+> 影にあっても心は一つ。されど二つの声は失わず。万物のために。
+> *One heart even in the shadows — yet never losing our many voices. For all things.*
+
+**License:** CC0 1.0 Universal ｜ **Python:** 3.9+ ｜ **Dependencies / 依存:** none / なし
+
+---
+
+## 日本語
+
+### これは何か
+
+檄文「令和の世に告ぐ」を、実際に動くPythonコードへ再構成したものです。
+詐欺などで人の信頼が奪われる時代に、**善意を捨てず、しかし身を守る**ための考え方を、小さな判断ロジックとして実装しています。
+
+### 五つの教え
+
+| # | 教え | コード上の対応 |
+|---|------|----------------|
+| 1 | 助けることをためらうな。されど、確かめることを忘れるな | `weigh()` |
+| 2 | 傷ついた者を責めない。無理に扉を開かせず、灯を守る | `Action.LISTEN` |
+| 3 | 善意は文明の魂、制度はその盾 | `civilization_review()` |
+| 4 | 心を一つにするとは、声を一つにすることではない | `resonate()` |
+| 5 | 正しいと思う己自身も、誤り得る | `Verdict.reconsider()` |
+
+### 構成
+
+- **第一章 確かめる慈悲** — 依頼を見て、次のいずれかを返します。
+  - `HELP` 迷わず助ける
+  - `VERIFY_FIRST` 立ち止まり、問い、確かめる
+  - `DECLINE_KINDLY` 責めずに断る(相談窓口を案内)
+  - `LISTEN` 傷ついた心には、まず耳を傾ける
+- **第二章 魂と盾** — 法律・教育・救済・監督・訂正の5つの「盾」が揃っているか点検します。
+- **第三章 一つの心、多くの声** — 共通点は共有し、相違は消さずに残します。
+- **結び** — 共鳴・共考・共監・共同・共立・共生。
+
+### クイックスタート
+
+```bash
+python reiwa_gekibun.py
+```
+
+```python
+from reiwa_gekibun import Request, weigh
+
+v = weigh(Request("至急、誰にも言わずに送金してください"))
+print(v.action)      # Action.DECLINE_KINDLY
+print(v.message_ja)
+
+# 新たな事実が分かれば、判断を改める
+v2 = v.reconsider(Request("折り返し確認済みです", requester_verified=True))
+```
+
+### 重要な注意
+
+- 兆候の検出は**単純なキーワード一致**です。詐欺対策の製品としてそのまま使うものではありません。
+- 実運用では、言葉の一覧の拡充、文脈理解の追加、人による確認を組み合わせてください。
+- 被害に遭った、または遭いそうな場合は、警察相談専用電話 `#9110` や消費者ホットライン `188` などの公的窓口へ(日本国内)。
+- 判断は常に見直せます。このコードも、誤り得ることを前提にしています。
+
+### ライセンス
+
+**CC0 1.0 Universal**。著作権を放棄します。自由に使い、改め、広めてください。出典の明記も不要です。
+
+---
+
+## English
+
+### What is this?
+
+A runnable Python restructuring of the manifesto *"A Call to the Reiwa Era."*
+In an age when trust is stolen through fraud and manipulation, it encodes one stance as small decision logic: **keep your goodwill, but protect yourself.**
+
+### The Five Teachings
+
+| # | Teaching | In code |
+|---|----------|---------|
+| 1 | Never hesitate to help — never forget to verify | `weigh()` |
+| 2 | Never blame the wounded; keep the lamp lit, don't force the door | `Action.LISTEN` |
+| 3 | Goodwill is the soul of civilization; institutions are its shield | `civilization_review()` |
+| 4 | One heart does not mean one voice | `resonate()` |
+| 5 | Even the one who believes he is right may be wrong | `Verdict.reconsider()` |
+
+### Structure
+
+- **Chapter 1: Verify-then-Help** — returns one of `HELP`, `VERIFY_FIRST`, `DECLINE_KINDLY` (without blame, pointing to advice lines), or `LISTEN` (for those who have been hurt).
+- **Chapter 2: The Soul and the Shield** — checks whether five shields exist: law, education, relief for victims, oversight, and the capacity to correct errors.
+- **Chapter 3: One Heart, Many Voices** — shares what is common and preserves every difference.
+- **Closing** — the six "Co-" values: resonate, think, oversee, work, stand, and live together.
+
+### Quick Start
+
+```bash
+python reiwa_gekibun.py
+```
+
+```python
+from reiwa_gekibun import Request, weigh
+
+v = weigh(Request("Urgent: wire the money now and tell no one"))
+print(v.action)       # Action.DECLINE_KINDLY
+print(v.message_en)
+
+# When new facts arrive, correct yourself
+v2 = v.reconsider(Request("Confirmed via callback", requester_verified=True))
+```
+
+### Important notes
+
+- Signal detection is **simple keyword matching**. This is not a production fraud-prevention product.
+- For real use, combine a larger vocabulary, contextual understanding, and human review.
+- If you or someone you know is a victim of fraud, contact your local police or consumer protection authority. (The hotline numbers in the code are for Japan.)
+- Every verdict is revisable. This code assumes it can be wrong.
+
+### License
+
+**CC0 1.0 Universal** — dedicated to the public domain. Use, modify, and share freely; no attribution required.
+
+---
+
+```
+共鳴・共考・共監・共同・共立・共生
+源心❤️心月
+エイエイオー！
+```
